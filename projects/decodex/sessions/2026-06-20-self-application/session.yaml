@@ -1,0 +1,25 @@
+{
+  "id": "decodex-2026-06-20-self-application",
+  "project": "decodex",
+  "date": "2026-06-20",
+  "goal": "Adopt Decodex self-application from the beginning of its development.",
+  "changes": [
+    "recorded a validated self-application decision"
+  ],
+  "validation": {
+    "results": [
+      "decision conforms to the current decision contract"
+    ]
+  },
+  "lessons": {
+    "project": [
+      "Decodex must be its own first managed project"
+    ],
+    "global_candidates": [
+      "a tool for development memory should dogfood its own workflow from the earliest usable version"
+    ]
+  },
+  "artifacts": [
+    "projects/decodex/decisions/2026-06-20-self-application-policy.yaml"
+  ]
+}
