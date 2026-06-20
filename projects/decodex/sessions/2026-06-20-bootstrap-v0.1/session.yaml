@@ -1,0 +1,42 @@
+{
+  "id": "decodex-2026-06-20-bootstrap-v0.1",
+  "project": "decodex",
+  "date": "2026-06-20",
+  "goal": "Bootstrap Decodex itself as a validated local memory system.",
+  "inputs": [
+    "mission brief",
+    "target repository workspace"
+  ],
+  "changes": [
+    "initial repository skeleton",
+    "manifest and schema files",
+    "starter tools",
+    "initial global skill"
+  ],
+  "validation": {
+    "commands": [
+      "validate repository structure",
+      "inspect Python runtime availability"
+    ],
+    "results": [
+      "workspace scaffolded",
+      "local Python interpreter found"
+    ]
+  },
+  "lessons": {
+    "project": [
+      "Decodex should be able to validate its own contract early."
+    ],
+    "global_candidates": [
+      "prefer contract tests before expanding a CLI",
+      "make the first recorded session about the system itself"
+    ]
+  },
+  "artifacts": [
+    "README.md",
+    "decodex.yaml",
+    "schemas/*.json",
+    "tools/*.py"
+  ]
+}
+

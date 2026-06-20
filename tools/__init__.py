@@ -1,0 +1,2 @@
+"""Decodex tool package."""
+

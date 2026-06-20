@@ -1,0 +1,13 @@
+{
+  "id": "pac-hunt-2",
+  "name": "Pac-Hunt 2",
+  "status": "active",
+  "domains": [
+    "game",
+    "playwright",
+    "performance"
+  ],
+  "notes": [
+    "Store only project-confirmed knowledge here."
+  ]
+}

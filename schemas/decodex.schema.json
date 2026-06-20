@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Decodex Manifest",
+  "type": "object",
+  "required": [
+    "name",
+    "version",
+    "status",
+    "runtime",
+    "layers",
+    "registry",
+    "conventions"
+  ],
+  "properties": {
+    "name": { "type": "string" },
+    "version": { "type": "string" },
+    "status": { "type": "string" },
+    "runtime": {
+      "type": "object",
+      "properties": {
+        "python_executable": { "type": "string" },
+        "python_candidates": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "additionalProperties": true
+    },
+    "layers": { "type": "object" },
+    "registry": { "type": "object" },
+    "conventions": { "type": "object" }
+  },
+  "additionalProperties": true
+}
+

@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Decodex Decision",
+  "type": "object",
+  "required": [
+    "id",
+    "project",
+    "summary",
+    "status"
+  ],
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "project": {
+      "type": "string"
+    },
+    "summary": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "candidate",
+        "validated",
+        "deprecated"
+      ]
+    }
+  },
+  "additionalProperties": true
+}
+

@@ -1,0 +1,56 @@
+{
+  "id": "safe-runtime-modification",
+  "title": "Safe Runtime Modification",
+  "version": "0.1.0",
+  "status": "validated",
+  "scope": "global",
+  "origin_projects": [
+    "open-elearning",
+    "terminalquest"
+  ],
+  "tags": [
+    "runtime",
+    "backup",
+    "rollback",
+    "validation",
+    "safety"
+  ],
+  "problem": {
+    "summary": "Modify or install a runtime component without losing the previous state."
+  },
+  "when_to_use": [
+    "installation of a plugin",
+    "modification of a user environment",
+    "operation difficult to undo manually"
+  ],
+  "preconditions": [
+    "identify all affected files",
+    "know the exact runtime location",
+    "have a backup workspace available"
+  ],
+  "procedure": [
+    "create a dated snapshot",
+    "hash the relevant files",
+    "apply the modification",
+    "compare source and runtime",
+    "test the real behavior",
+    "create a rollback script",
+    "document the result"
+  ],
+  "validation": {
+    "required": [
+      "snapshot present",
+      "hashes verified",
+      "functional test passed",
+      "rollback available"
+    ]
+  },
+  "failure_modes": [
+    "wrong target folder",
+    "incomplete backup",
+    "source and runtime mismatch",
+    "syntax-only verification"
+  ],
+  "confidence": "high",
+  "last_reviewed": "2026-06-20"
+}

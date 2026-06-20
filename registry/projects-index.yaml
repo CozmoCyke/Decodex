@@ -1,0 +1,14 @@
+{
+  "projects": [
+    {
+      "id": "decodex",
+      "status": "active",
+      "path": "projects/decodex"
+    },
+    {
+      "id": "pac-hunt-2",
+      "status": "active",
+      "path": "projects/pac-hunt-2"
+    }
+  ]
+}

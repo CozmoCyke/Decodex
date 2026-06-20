@@ -1,0 +1,37 @@
+{
+  "name": "Decodex",
+  "version": "0.1.1",
+  "status": "mvp",
+  "runtime": {
+    "python_candidates": [
+      "python",
+      "python3"
+    ]
+  },
+  "layers": {
+    "inbox": {
+      "purpose": "raw session evidence"
+    },
+    "projects": {
+      "purpose": "validated project-specific knowledge"
+    },
+    "global": {
+      "purpose": "cross-project reusable knowledge"
+    }
+  },
+  "registry": {
+    "skills_index": "registry/skills-index.yaml",
+    "projects_index": "registry/projects-index.yaml",
+    "promotion_history": "registry/promotion-history.jsonl"
+  },
+  "conventions": {
+    "knowledge_states": [
+      "RAW",
+      "OBSERVED",
+      "CANDIDATE",
+      "PROJECT_VALIDATED",
+      "GLOBAL_VALIDATED",
+      "DEPRECATED"
+    ]
+  }
+}

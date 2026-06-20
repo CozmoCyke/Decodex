@@ -1,0 +1,27 @@
+{
+  "skills": [
+    {
+      "id": "safe-runtime-modification",
+      "scope": "global",
+      "status": "validated",
+      "tags": [
+        "runtime",
+        "backup",
+        "rollback",
+        "validation",
+        "safety"
+      ]
+    },
+    {
+      "id": "static-dynamic-render-split",
+      "scope": "global",
+      "status": "validated",
+      "tags": [
+        "performance",
+        "rendering",
+        "playwright",
+        "gameplay"
+      ]
+    }
+  ]
+}

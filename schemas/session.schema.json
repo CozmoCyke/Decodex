@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Decodex Session",
+  "type": "object",
+  "required": [
+    "id",
+    "project",
+    "date",
+    "goal"
+  ],
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "project": {
+      "type": "string"
+    },
+    "date": {
+      "type": "string"
+    },
+    "goal": {
+      "type": "string"
+    }
+  },
+  "additionalProperties": true
+}
+

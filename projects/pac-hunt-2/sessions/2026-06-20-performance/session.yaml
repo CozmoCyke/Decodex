@@ -1,0 +1,39 @@
+{
+  "id": "pac-hunt-2-2026-06-20-performance",
+  "project": "pac-hunt-2",
+  "date": "2026-06-20",
+  "goal": "Corriger les problèmes de performance sans modifier le gameplay.",
+  "inputs": [
+    "code du jeu",
+    "tests Playwright existants"
+  ],
+  "changes": [
+    "rendu statique du labyrinthe",
+    "cache des éléments du HUD",
+    "conservation d'une boucle requestAnimationFrame unique"
+  ],
+  "validation": {
+    "commands": [
+      "npx playwright test tests/pachunt-performance.spec.mjs",
+      "npx playwright test"
+    ],
+    "results": [
+      "performance_headless: 5/5",
+      "performance_headed: 5/5",
+      "full_suite: 36/36"
+    ]
+  },
+  "lessons": {
+    "project": [
+      "le labyrinthe ne doit pas être redessiné à chaque frame"
+    ],
+    "global_candidates": [
+      "séparer le rendu statique du rendu dynamique",
+      "ajouter un test de performance avant toute optimisation"
+    ]
+  },
+  "artifacts": [
+    "PACHUNT2_PERFORMANCE_FIX_REPORT.md"
+  ]
+}
+

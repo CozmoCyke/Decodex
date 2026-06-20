@@ -1,0 +1,2 @@
+{"ts":"2026-06-20T00:00:00Z","skill_id":"safe-runtime-modification","from":"project","to":"global","status":"seeded"}
+{"ts":"2026-06-20T00:00:00Z","skill_id":"static-dynamic-render-split","from":"project","to":"global","status":"seeded","project":"pac-hunt-2","source_path":"projects/pac-hunt-2/skills/static-dynamic-render-split","target_path":"global/skills/static-dynamic-render-split"}

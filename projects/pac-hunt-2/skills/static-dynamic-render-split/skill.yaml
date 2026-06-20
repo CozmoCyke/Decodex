@@ -1,0 +1,49 @@
+{
+  "id": "static-dynamic-render-split",
+  "title": "Static and Dynamic Render Split",
+  "version": "0.1.0",
+  "status": "candidate",
+  "scope": "project",
+  "origin_projects": [
+    "pac-hunt-2"
+  ],
+  "tags": [
+    "performance",
+    "rendering",
+    "playwright",
+    "gameplay"
+  ],
+  "problem": {
+    "summary": "Improve frame time by separating static maze rendering from dynamic HUD updates without changing gameplay."
+  },
+  "when_to_use": [
+    "the game redraws static scenery every frame",
+    "performance regressions appear in headless or headed Playwright runs"
+  ],
+  "preconditions": [
+    "baseline performance measurements exist",
+    "behavioral regression tests already pass"
+  ],
+  "procedure": [
+    "identify the static and dynamic layers",
+    "cache the static drawing path",
+    "keep a single requestAnimationFrame loop",
+    "run headless and headed performance checks",
+    "run the full regression suite"
+  ],
+  "validation": {
+    "required": [
+      "headless performance passes",
+      "headed performance passes",
+      "full regression suite passes"
+    ]
+  },
+  "failure_modes": [
+    "gameplay changes during a technical fix",
+    "static content is still redrawn each frame",
+    "performance tests are skipped"
+  ],
+  "confidence": "high",
+  "last_reviewed": "2026-06-20"
+}
+

@@ -1,0 +1,13 @@
+{
+  "id": "decodex",
+  "name": "Decodex",
+  "status": "active",
+  "domains": [
+    "meta",
+    "documentation",
+    "workflow"
+  ],
+  "notes": [
+    "Bootstrap project for Decodex itself."
+  ]
+}
