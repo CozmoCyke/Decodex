@@ -29,7 +29,7 @@ jobs:
         run: python tools/decodex.py audit --root ${{ github.workspace }}
 
       - name: Context smoke test
-        run: python tools/decodex.py context --project pac-hunt-2 --root ${{ github.workspace }} --output-root ${{ runner.temp }}/decodex-context
+        run: python tools/decodex.py context --project pac-hunt-2 --root ${{ github.workspace }} --output-root ${{ github.workspace }}/.decodex-ci/pac-hunt-2
 
       - name: Context check smoke test
-        run: python tools/decodex.py context-check --project pac-hunt-2 --context-root ${{ runner.temp }}/decodex-context
+        run: python tools/decodex.py context-check --project pac-hunt-2 --context-root ${{ github.workspace }}/.decodex-ci/pac-hunt-2
