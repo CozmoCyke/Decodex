@@ -1,0 +1,40 @@
+{
+  "id": "2026-06-20-v0.1.3-self-improving-development-loop",
+  "project": "decodex",
+  "context_check_passed": true,
+  "git": {
+    "branch": "main",
+    "head": "789ceb9",
+    "status": "## main...origin/main\n M README.md\n M decodex.yaml\n M decodex_core.py\n M schemas/decision.schema.json\n M schemas/decodex.schema.json\n M schemas/project.schema.json\n M schemas/session.schema.json\n M schemas/skill.schema.json\n M tests/test_contract.py\n M tests/test_golden_path.py\n M tools/decodex.py\n?? .codex/\n?? projects/decodex/decisions/0001-supervised-self-improving-loop.json\n?? projects/decodex/skills/"
+  },
+  "tests": [
+    "python -m unittest discover -s tests -v",
+    "python tools\\decodex.py validate --root .",
+    "python tools\\decodex.py audit --root .",
+    "python tools\\decodex.py context-check --project decodex --context-root ."
+  ],
+  "lessons": [
+    "Decodex generated a compiled .codex context and used it to guide a supervised improvement.",
+    "The context-check must compare provenance and rendered artifacts, not just file presence."
+  ],
+  "artifacts": [
+    ".codex/",
+    "projects/decodex/decisions/0001-supervised-self-improving-loop.json",
+    "projects/decodex/skills/context-compliance-review/skill.yaml"
+  ],
+  "feedback": {
+    "useful_rules": [
+      "validate before audit",
+      "refuse writes outside workspace"
+    ],
+    "missing_rules": [
+      "require a clean Git worktree before schema migration"
+    ],
+    "ambiguous_rules": [
+      "preserve provenance for generated files"
+    ],
+    "skill_candidates": [
+      "context-compliance-review"
+    ]
+  }
+}

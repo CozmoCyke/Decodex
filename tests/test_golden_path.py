@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from decodex_core import build_context, capture_session, load_jsonish, promote_skill, search_repository
+from decodex_core import build_context, capture_session, context_check, load_jsonish, promote_skill, search_repository
 
 
 class GoldenPathTests(unittest.TestCase):
@@ -83,6 +83,7 @@ class GoldenPathTests(unittest.TestCase):
         provenance = json.loads((context_dir / "provenance.json").read_text(encoding="utf-8"))
         self.assertEqual(provenance["project"], "pac-hunt-2")
         self.assertTrue(any(item["id"] == "static-dynamic-render-split" for item in provenance["inherited_skills"]))
+        self.assertEqual(context_check(self.root, project="pac-hunt-2", context_root=self.root / "generated"), [])
 
 
 if __name__ == "__main__":

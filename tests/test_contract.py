@@ -15,12 +15,15 @@ if str(ROOT) not in sys.path:
 from decodex_core import (
     audit_repository,
     DecodexError,
+    build_context,
     capture_session,
+    context_check,
     init_project,
     init_workspace,
     load_jsonish,
     resolve_python_interpreter,
     search_repository,
+    session_close,
     validate_repository,
 )
 
@@ -34,6 +37,7 @@ class ContractTests(unittest.TestCase):
             self.root,
             ignore=shutil.ignore_patterns(".git", "__pycache__", ".pytest_cache"),
         )
+        build_context(self.root, project="decodex", output_root=self.root)
 
     def tearDown(self) -> None:
         self._tmp.cleanup()
@@ -41,6 +45,7 @@ class ContractTests(unittest.TestCase):
     def test_repository_contract_validates(self) -> None:
         self.assertEqual(validate_repository(self.root), [])
         self.assertEqual(audit_repository(self.root), [])
+        self.assertEqual(context_check(self.root, project="decodex"), [])
 
     def test_bootstrap_session_fixture_is_present(self) -> None:
         session = load_jsonish(
@@ -127,6 +132,49 @@ class ContractTests(unittest.TestCase):
         self.assertTrue((target / "registry" / "projects-index.yaml").exists())
         self.assertGreater(len(created), 0)
         self.assertEqual(validate_repository(target), [])
+
+    def test_context_check_detects_stale_context(self) -> None:
+        context_file = self.root / ".codex" / "project-context.md"
+        context_file.write_text(context_file.read_text(encoding="utf-8") + "\n- tampered\n", encoding="utf-8")
+        errors = context_check(self.root, project="decodex")
+        self.assertTrue(any("context diverges" in error or "stale" in error for error in errors))
+
+    def test_session_close_writes_compliance_report_and_feedback(self) -> None:
+        report = session_close(
+            self.root,
+            project="decodex",
+            session="2026-06-20-v0.1.3-self-improving-development-loop",
+            tests=[
+                "python -m unittest discover -s tests -v",
+                "python tools\\decodex.py validate --root .",
+                "python tools\\decodex.py audit --root .",
+            ],
+            lessons=[
+                "Decodex can now verify and initialize its own memory.",
+            ],
+            artifacts=[
+                "README.md",
+                "decodex.yaml",
+            ],
+            useful_rules=[
+                "validate before audit",
+                "refuse writes outside workspace",
+            ],
+            missing_rules=[
+                "require a clean Git worktree before schema migration",
+            ],
+            ambiguous_rules=[
+                "preserve provenance for generated files",
+            ],
+            skill_candidates=[
+                "context-compliance-review",
+            ],
+        )
+        self.assertTrue(report.exists())
+        session_dir = report.parent
+        self.assertTrue((session_dir / "feedback.yaml").exists())
+        self.assertTrue((session_dir / "session.yaml").exists())
+        self.assertTrue((self.root / "projects" / "decodex" / "skills" / "context-compliance-review" / "skill.yaml").exists())
 
 
 if __name__ == "__main__":

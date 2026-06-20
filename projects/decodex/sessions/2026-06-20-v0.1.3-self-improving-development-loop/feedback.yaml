@@ -1,0 +1,13 @@
+context_feedback:
+useful_rules:
+  - validate before audit
+  - refuse writes outside workspace
+
+missing_rules:
+  - require a clean Git worktree before schema migration
+
+ambiguous_rules:
+  - preserve provenance for generated files
+
+skill_candidates:
+  - context-compliance-review

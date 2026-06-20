@@ -1,0 +1,143 @@
+{
+  "architecture": {
+    "layers": [
+      "inbox",
+      "projects",
+      "global"
+    ],
+    "summary": "Three-layer memory: inbox, project, global."
+  },
+  "decisions": [
+    {
+      "id": "0001-supervised-self-improving-loop",
+      "path": "projects/decodex/decisions/0001-supervised-self-improving-loop.json",
+      "sha256": "fae8d3cdf07170fc43cd35e7a5110008a89a43fc78ac5b9b3337348ae86aecad",
+      "status": "validated",
+      "summary": "Decodex will generate its own compiled context, use it for a supervised improvement, measure the result, and require human approval before any global promotion."
+    }
+  ],
+  "generated_at": "2026-06-20T13:09:33.517277+00:00",
+  "generated_hashes": {
+    "AGENTS.md": "1c6b48cb1736e1d6b8fc09f2d56f655454a176ed57adc8ce2e8f78e92f5584f4",
+    "inherited-skills.md": "9b9ecb69f468b39ff786b11c0b90596aa2497ad22b6bbb6800c121948482d371",
+    "project-context.md": "3c45bf427870966c929b84cce294a801d5546febb16290daeb09b6f1475dbabd",
+    "safety-checklist.md": "36106bd70786f1a5995c76550fac0a6462d169e71fa3cf69d11af1fc80bc29f3",
+    "testing-strategy.md": "27a08cfa3edcb4b0448d964a022ca88e165031ac3bcef2b7b089fa35d5d61c6e"
+  },
+  "inherited_skills": [
+    {
+      "confidence": "high",
+      "evidence": [],
+      "id": "safe-runtime-modification",
+      "origin_project": "unknown",
+      "scope": "global",
+      "source_path": "global/skills/safe-runtime-modification/skill.yaml",
+      "title": "Safe Runtime Modification"
+    },
+    {
+      "confidence": "high",
+      "evidence": [
+        "projects/pac-hunt-2/reports/PACHUNT2_PERFORMANCE_FIX_REPORT.md"
+      ],
+      "id": "static-dynamic-render-split",
+      "origin_project": "pac-hunt-2",
+      "scope": "global",
+      "source_path": "global/skills/static-dynamic-render-split/skill.yaml",
+      "title": "Static and Dynamic Render Split"
+    }
+  ],
+  "project": "decodex",
+  "project_skills": [
+    {
+      "confidence": "medium",
+      "evidence": [
+        "projects/decodex/sessions/2026-06-20-v0.1.3-self-improving-development-loop/compliance-report.md",
+        "projects/decodex/sessions/2026-06-20-v0.1.3-self-improving-development-loop/feedback.yaml"
+      ],
+      "id": "context-compliance-review",
+      "origin_project": "decodex",
+      "scope": "project",
+      "source_path": "projects/decodex/skills/context-compliance-review/skill.yaml",
+      "title": "Context Compliance Review"
+    }
+  ],
+  "security_rules": [
+    {
+      "id": "deny-outside-workspace",
+      "scope": "global",
+      "source": "decodex_core.py",
+      "statement": "Refuse writes outside the workspace root."
+    },
+    {
+      "id": "validate-before-audit",
+      "scope": "global",
+      "source": "README.md",
+      "statement": "Run validate before audit."
+    },
+    {
+      "id": "no-auto-global-promotion",
+      "scope": "project",
+      "source": "projects/decodex/sessions/2026-06-20-v0.1.3-self-improving-development-loop/session.yaml",
+      "statement": "Never promote global skills automatically in v0.1.3."
+    }
+  ],
+  "self_application_policy": [
+    "Decodex prepares the context, Codex executes the change, Decodex measures the result, a human validates the promotion."
+  ],
+  "source_files": [
+    {
+      "path": "README.md",
+      "sha256": "43f1868c97b0733e141bce36efc29afed35ccdb370d1c8ab212013bbebfacf87"
+    },
+    {
+      "path": "decodex.yaml",
+      "sha256": "58f7b6e374abdbd1ee045c118074c160d1ade8b393593cfe2c36bd11d3cb6402"
+    },
+    {
+      "path": "registry/skills-index.yaml",
+      "sha256": "ca397df67d12b17c668641943a73080149f9906f99f90d276aaa73bb3ff93188"
+    },
+    {
+      "path": "registry/projects-index.yaml",
+      "sha256": "d4384be7910bd1b8835386100c6e7f82b3cae3afda53e2d58d40c16ef4487732"
+    },
+    {
+      "path": "projects/decodex/project.yaml",
+      "sha256": "dc881a997030c22840519c11a341851b3e0abf785064c027d40cbcf826ce36a0"
+    },
+    {
+      "path": "projects/decodex/decisions/0001-supervised-self-improving-loop.json",
+      "sha256": "fae8d3cdf07170fc43cd35e7a5110008a89a43fc78ac5b9b3337348ae86aecad"
+    },
+    {
+      "path": "global/skills/safe-runtime-modification/skill.yaml",
+      "sha256": "0be71338ca4905b896c8f0b0c4e69de08b82aff723b10d4f198859de251248b3"
+    },
+    {
+      "path": "global/skills/static-dynamic-render-split/skill.yaml",
+      "sha256": "24b7f4494e1cc62fce747165fd904151d358bfcb87f147a0a50aef51cb7ae3a9"
+    },
+    {
+      "path": "projects/decodex/skills/context-compliance-review/skill.yaml",
+      "sha256": "c4b66cc9849cb47d8ea8c68a84a8ea817ab13e07362306c3e81a6dfacf9d8f11"
+    }
+  ],
+  "source_hashes": {
+    "README.md": "43f1868c97b0733e141bce36efc29afed35ccdb370d1c8ab212013bbebfacf87",
+    "decodex.yaml": "58f7b6e374abdbd1ee045c118074c160d1ade8b393593cfe2c36bd11d3cb6402",
+    "global/skills/safe-runtime-modification/skill.yaml": "0be71338ca4905b896c8f0b0c4e69de08b82aff723b10d4f198859de251248b3",
+    "global/skills/static-dynamic-render-split/skill.yaml": "24b7f4494e1cc62fce747165fd904151d358bfcb87f147a0a50aef51cb7ae3a9",
+    "projects/decodex/decisions/0001-supervised-self-improving-loop.json": "fae8d3cdf07170fc43cd35e7a5110008a89a43fc78ac5b9b3337348ae86aecad",
+    "projects/decodex/project.yaml": "dc881a997030c22840519c11a341851b3e0abf785064c027d40cbcf826ce36a0",
+    "projects/decodex/skills/context-compliance-review/skill.yaml": "c4b66cc9849cb47d8ea8c68a84a8ea817ab13e07362306c3e81a6dfacf9d8f11",
+    "registry/projects-index.yaml": "d4384be7910bd1b8835386100c6e7f82b3cae3afda53e2d58d40c16ef4487732",
+    "registry/skills-index.yaml": "ca397df67d12b17c668641943a73080149f9906f99f90d276aaa73bb3ff93188"
+  },
+  "validation_commands": [
+    "python -m unittest discover -s tests -v",
+    "python tools\\decodex.py validate --root .",
+    "python tools\\decodex.py audit --root .",
+    "python tools\\decodex.py context-check --project decodex --context-root .",
+    "python tools\\decodex.py session-close --project decodex --session <session-id>"
+  ]
+}

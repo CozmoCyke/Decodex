@@ -1,0 +1,36 @@
+{
+  "id": "2026-06-20-v0.1.3-self-improving-development-loop",
+  "project": "decodex",
+  "date": "2026-06-20",
+  "goal": "Finalize the v0.1.3 supervised self-improving loop.",
+  "validation": {
+    "commands": [
+      "python -m unittest discover -s tests -v",
+      "python tools\\decodex.py validate --root .",
+      "python tools\\decodex.py audit --root .",
+    "python tools\\decodex.py context-check --project decodex --context-root ."
+    ],
+    "results": [
+      "recorded"
+    ]
+  },
+  "lessons": {
+    "project": [
+      "Decodex generated a compiled .codex context and used it to guide a supervised improvement.",
+      "The context-check must compare provenance and rendered artifacts, not just file presence."
+    ],
+    "global_candidates": [
+      "validate before audit",
+      "refuse writes outside workspace",
+      "context-compliance-review"
+    ]
+  },
+  "artifacts": [
+    ".codex/",
+    "projects/decodex/decisions/0001-supervised-self-improving-loop.json",
+    "projects/decodex/skills/context-compliance-review/skill.yaml",
+    "compliance-report.md",
+    "feedback.yaml",
+    "session-close.json"
+  ]
+}

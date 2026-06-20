@@ -1,6 +1,6 @@
 {
   "name": "Decodex",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "status": "mvp",
   "runtime": {
     "python_candidates": [

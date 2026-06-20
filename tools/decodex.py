@@ -18,6 +18,8 @@ from decodex_core import (
     init_project,
     init_workspace,
     promote_skill,
+    context_check,
+    session_close,
     resolve_python_interpreter,
     search_repository,
     validate_repository,
@@ -81,6 +83,26 @@ def build_parser() -> argparse.ArgumentParser:
     init_project_parser.add_argument("--source", type=Path)
     init_project_parser.add_argument("--force", action="store_true")
     init_project_parser.set_defaults(command="init-project")
+
+    context_check_parser = subparsers.add_parser("context-check")
+    context_check_parser.add_argument("--root", default=default_root(), type=Path)
+    context_check_parser.add_argument("--project", required=True)
+    context_check_parser.add_argument("--context-root", type=Path)
+    context_check_parser.set_defaults(command="context-check")
+
+    session_close_parser = subparsers.add_parser("session-close")
+    session_close_parser.add_argument("--root", default=default_root(), type=Path)
+    session_close_parser.add_argument("--project", required=True)
+    session_close_parser.add_argument("--session", required=True)
+    session_close_parser.add_argument("--context-root", type=Path)
+    session_close_parser.add_argument("--test", action="append", default=[])
+    session_close_parser.add_argument("--lesson", action="append", default=[])
+    session_close_parser.add_argument("--artifact", action="append", default=[])
+    session_close_parser.add_argument("--useful-rule", action="append", default=[])
+    session_close_parser.add_argument("--missing-rule", action="append", default=[])
+    session_close_parser.add_argument("--ambiguous-rule", action="append", default=[])
+    session_close_parser.add_argument("--skill-candidate", action="append", default=[])
+    session_close_parser.set_defaults(command="session-close")
 
     return parser
 
@@ -157,6 +179,32 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "init-project":
             init_project(root, args.project, source=args.source, force=args.force)
             print(root / "projects" / args.project)
+            return 0
+
+        if args.command == "context-check":
+            errors = context_check(root, project=args.project, context_root=args.context_root)
+            if errors:
+                for error in errors:
+                    print(error, file=sys.stderr)
+                return 1
+            print("Decodex context check passed")
+            return 0
+
+        if args.command == "session-close":
+            report = session_close(
+                root,
+                project=args.project,
+                session=args.session,
+                context_root=args.context_root,
+                tests=list(args.test),
+                lessons=list(args.lesson),
+                artifacts=list(args.artifact),
+                useful_rules=list(args.useful_rule),
+                missing_rules=list(args.missing_rule),
+                ambiguous_rules=list(args.ambiguous_rule),
+                skill_candidates=list(args.skill_candidate),
+            )
+            print(report)
             return 0
 
         raise DecodexError(f"unknown command: {args.command}")
