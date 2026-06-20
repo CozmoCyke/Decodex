@@ -1,0 +1,12 @@
+{
+  "context_feedback": {
+    "useful_rules": [
+      "source context stays cautious"
+    ],
+    "missing_rules": [],
+    "ambiguous_rules": [],
+    "skill_candidates": [
+      "context-compliance-review"
+    ]
+  }
+}

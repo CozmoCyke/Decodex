@@ -367,7 +367,7 @@ class SkillLifecycleTests(unittest.TestCase):
     def _case_runtime_resolution(self) -> None:
         repo = self.make_repo()
         self.assertTrue((repo / "decodex.yaml").exists())
-        self.assertEqual(load_jsonish(repo / "decodex.yaml")["version"], "0.1.4")
+        self.assertEqual(load_jsonish(repo / "decodex.yaml")["version"], "0.1.5")
 
 
 if __name__ == "__main__":

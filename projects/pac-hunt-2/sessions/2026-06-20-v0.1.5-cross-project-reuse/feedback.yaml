@@ -1,0 +1,12 @@
+{
+  "context_feedback": {
+    "useful_rules": [
+      "target project uses the reused skill"
+    ],
+    "missing_rules": [],
+    "ambiguous_rules": [],
+    "skill_candidates": [
+      "context-compliance-review"
+    ]
+  }
+}

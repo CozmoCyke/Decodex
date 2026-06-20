@@ -1,42 +1,36 @@
 # Changelog
 
-## v0.1.4 — Evidence-Based Skill Lifecycle
+## v0.1.5 — Cross-Project Reuse Proof
 
-Decodex now manages the lifecycle of development skills using traceable evidence rather than relying only on manually assigned status.
+Decodex can now apply a validated project skill from one project to another while preserving source provenance, application immutability, and context traceability.
 
 ### Added
 
-* `skill-eval` for immutable evaluation runs
-* `skill-review` for evidence aggregation and cautious recommendations
-* `skill-revise` for versioned skill evolution
-* `skill-diff` for comparing recorded skill versions
-* schemas for skill evaluations, reviews, and revisions
-* lifecycle consistency checks in repository audits
-* lifecycle metadata in compiled `.codex/` contexts
-* CI validation on Windows and Ubuntu
+* `skill-apply` for immutable cross-project skill applications
+* `skill-application.schema.json` for application artifacts
+* applied project skills in compiled `.codex/` contexts
+* provenance checks for application source hashes and session paths
+* audit checks for duplicate applications, version mixing, and source hash drift
 
 ### Improved
 
-* decision discovery supports JSON, YAML, and YML files
-* `session-close` no longer overwrites existing skills
-* promotion preserves previous versions instead of deleting history
-* compiled context includes skill version, status, confidence, latest review, and recommendation
+* `skill-review` now aggregates cross-project evidence cautiously
+* evaluation artifacts can link back to their application and session
+* repository validation covers application artifacts
+* project contexts now list applied project skills separately from inherited skills
 
-### First evidence-based review
+### Pilot
 
-The `context-compliance-review` skill remains deliberately cautious:
+The `context-compliance-review` skill was applied from `decodex` to `pac-hunt-2` and evaluated against the existing performance report.
+
+The first reuse signal remains cautious:
 
 * status: `candidate`
 * confidence: `low`
 * recommendation: `continue_evaluation`
 
-One successful evaluation provides useful evidence, but it is not sufficient for project validation or global promotion.
+Cross-project reuse is now traceable, but still subject to human validation before any broader promotion.
 
-### Validation
+## v0.1.4 — Evidence-Based Skill Lifecycle
 
-* unit-test suite
-* repository schema validation
-* repository coherence audit
-* compiled-context generation
-* context provenance and divergence checks
-* Windows and Ubuntu GitHub Actions matrix
+Decodex manages skill lifecycle using traceable evidence rather than relying only on manually assigned status.

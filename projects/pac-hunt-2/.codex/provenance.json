@@ -1,5 +1,38 @@
 {
-  "applied_project_skills": [],
+  "applied_project_skills": [
+    {
+      "application": {
+        "id": "context-compliance-review--decodex--pac-hunt-2--2026-06-20-v0.1.5-cross-project-reuse--0.1.0",
+        "path": "projects/pac-hunt-2/sessions/2026-06-20-v0.1.5-cross-project-reuse/skill-applications/context-compliance-review--decodex--pac-hunt-2--2026-06-20-v0.1.5-cross-project-reuse--0.1.0/application.yaml",
+        "report": "projects/pac-hunt-2/sessions/2026-06-20-v0.1.5-cross-project-reuse/skill-applications/context-compliance-review--decodex--pac-hunt-2--2026-06-20-v0.1.5-cross-project-reuse--0.1.0/report.md",
+        "source_hash": "6151e3ed7864ee24b0b9e572ec6eb3996e538c00077b178caffb7ef5264405dd",
+        "source_skill_path": "projects/decodex/skills/context-compliance-review/skill.yaml",
+        "status": "applied"
+      },
+      "confidence": "low",
+      "id": "context-compliance-review",
+      "latest_evaluation": {
+        "id": "source-eval",
+        "path": "projects/decodex/skills/context-compliance-review/evaluations/source-eval/evaluation.yaml",
+        "recommendation": "continue_evaluation"
+      },
+      "latest_review": {
+        "approved_by": null,
+        "id": "2026-06-20-v0.1.4-evidence-based-skill-lifecycle-review",
+        "path": "projects/decodex/skills/context-compliance-review/reviews/2026-06-20-v0.1.4-evidence-based-skill-lifecycle/review.yaml",
+        "recommendation": "continue_evaluation"
+      },
+      "origin_project": "decodex",
+      "recommendation": "continue_evaluation",
+      "session": "2026-06-20-v0.1.5-cross-project-reuse",
+      "source_hash": "6151e3ed7864ee24b0b9e572ec6eb3996e538c00077b178caffb7ef5264405dd",
+      "source_skill_path": "projects/decodex/skills/context-compliance-review/skill.yaml",
+      "status": "candidate",
+      "target_project": "pac-hunt-2",
+      "title": "Context Compliance Review",
+      "version": "0.1.0"
+    }
+  ],
   "architecture": {
     "layers": [
       "inbox",
@@ -8,27 +41,12 @@
     ],
     "summary": "Three-layer memory: inbox, project, global."
   },
-  "decisions": [
-    {
-      "id": "0001-supervised-self-improving-loop",
-      "path": "projects/decodex/decisions/0001-supervised-self-improving-loop.json",
-      "sha256": "fae8d3cdf07170fc43cd35e7a5110008a89a43fc78ac5b9b3337348ae86aecad",
-      "status": "validated",
-      "summary": "Decodex will generate its own compiled context, use it for a supervised improvement, measure the result, and require human approval before any global promotion."
-    },
-    {
-      "id": "decodex-self-application-policy",
-      "path": "projects/decodex/decisions/2026-06-20-self-application-policy.yaml",
-      "sha256": "0a7802d742f4540c7cc3ba033489dd692d36cd86ebf1f261c122ef2326073ebb",
-      "status": "validated",
-      "summary": "Decodex must use its own capture, validation, audit, promotion, context, and provenance mechanisms throughout its development."
-    }
-  ],
-  "generated_at": "2026-06-20T21:37:22.593153+00:00",
+  "decisions": [],
+  "generated_at": "2026-06-20T21:37:23.126124+00:00",
   "generated_hashes": {
-    "AGENTS.md": "af2531b6f3c695652496cc2b46140f92f612aab1f433371412147a22a15ffb78",
+    "AGENTS.md": "34e67ad5b6f5210db2ddd34da882b334cc07ca4ea4befadd755782192289860e",
     "inherited-skills.md": "1ea26f6ace652a96b2f107f4104a33788841d09fb57768d95c7d1d817189823b",
-    "project-context.md": "ce960887e23af51944d2048371abe0c6236ff7f6a63d7cd910afba7c336ac485",
+    "project-context.md": "9a95d8a23c83c6738be36e26f044669c8611cce965c5b99e77dbbc2406168552",
     "safety-checklist.md": "36106bd70786f1a5995c76550fac0a6462d169e71fa3cf69d11af1fc80bc29f3",
     "testing-strategy.md": "27a08cfa3edcb4b0448d964a022ca88e165031ac3bcef2b7b089fa35d5d61c6e"
   },
@@ -66,7 +84,7 @@
       "version": "0.1.0"
     }
   ],
-  "project": "decodex",
+  "project": "pac-hunt-2",
   "project_skills": [
     {
       "confidence": "low",
@@ -76,14 +94,14 @@
       ],
       "id": "context-compliance-review",
       "latest_evaluation": {
-        "id": "source-eval",
-        "path": "projects/decodex/skills/context-compliance-review/evaluations/source-eval/evaluation.yaml",
+        "id": "target-eval",
+        "path": "projects/pac-hunt-2/skills/context-compliance-review/evaluations/target-eval/evaluation.yaml",
         "recommendation": "continue_evaluation"
       },
       "latest_review": {
-        "approved_by": null,
-        "id": "2026-06-20-v0.1.4-evidence-based-skill-lifecycle-review",
-        "path": "projects/decodex/skills/context-compliance-review/reviews/2026-06-20-v0.1.4-evidence-based-skill-lifecycle/review.yaml",
+        "approved_by": "human-reviewer",
+        "id": "cross-project-review",
+        "path": "projects/pac-hunt-2/skills/context-compliance-review/reviews/cross-project-review/review.yaml",
         "recommendation": "continue_evaluation"
       },
       "lifecycle": {
@@ -93,9 +111,26 @@
       "origin_project": "decodex",
       "recommendation": "continue_evaluation",
       "scope": "project",
-      "source_path": "projects/decodex/skills/context-compliance-review/skill.yaml",
+      "source_path": "projects/pac-hunt-2/skills/context-compliance-review/skill.yaml",
       "status": "candidate",
       "title": "Context Compliance Review",
+      "version": "0.1.0"
+    },
+    {
+      "confidence": "high",
+      "evidence": [
+        "projects/pac-hunt-2/reports/PACHUNT2_PERFORMANCE_FIX_REPORT.md"
+      ],
+      "id": "static-dynamic-render-split",
+      "latest_evaluation": null,
+      "latest_review": null,
+      "lifecycle": {},
+      "origin_project": "pac-hunt-2",
+      "recommendation": "unknown",
+      "scope": "project",
+      "source_path": "projects/pac-hunt-2/skills/static-dynamic-render-split/skill.yaml",
+      "status": "candidate",
+      "title": "Static and Dynamic Render Split",
       "version": "0.1.0"
     }
   ],
@@ -140,8 +175,8 @@
       "sha256": "d4384be7910bd1b8835386100c6e7f82b3cae3afda53e2d58d40c16ef4487732"
     },
     {
-      "path": "projects/decodex/project.yaml",
-      "sha256": "dc881a997030c22840519c11a341851b3e0abf785064c027d40cbcf826ce36a0"
+      "path": "projects/pac-hunt-2/project.yaml",
+      "sha256": "f3f114d16ce08955941be00628324924c676035d114a4615d50211b63bc797bd"
     },
     {
       "path": "projects/decodex/decisions/0001-supervised-self-improving-loop.json",
@@ -160,12 +195,16 @@
       "sha256": "24b7f4494e1cc62fce747165fd904151d358bfcb87f147a0a50aef51cb7ae3a9"
     },
     {
-      "path": "projects/decodex/skills/context-compliance-review/skill.yaml",
-      "sha256": "6151e3ed7864ee24b0b9e572ec6eb3996e538c00077b178caffb7ef5264405dd"
+      "path": "projects/pac-hunt-2/skills/context-compliance-review/skill.yaml",
+      "sha256": "647785c575a9f6f2d56ef61746a6cd9bd370ce0cd9a1877ef78dd4922f939fb4"
     },
     {
-      "path": "projects/decodex/skills/context-compliance-review/versions/0.1.0/skill.yaml",
-      "sha256": "c4b66cc9849cb47d8ea8c68a84a8ea817ab13e07362306c3e81a6dfacf9d8f11"
+      "path": "projects/pac-hunt-2/skills/context-compliance-review/versions/0.1.0/skill.yaml",
+      "sha256": "647785c575a9f6f2d56ef61746a6cd9bd370ce0cd9a1877ef78dd4922f939fb4"
+    },
+    {
+      "path": "projects/pac-hunt-2/skills/static-dynamic-render-split/skill.yaml",
+      "sha256": "118825babe4eee9573bb6aab770ab30e310fb464239a102e0b7519605f1ee28e"
     },
     {
       "path": "projects/decodex/skills/context-compliance-review/evaluations/2026-06-20-v0.1.4-evidence-based-skill-lifecycle/evaluation.yaml",
@@ -207,17 +246,18 @@
     "global/skills/static-dynamic-render-split/skill.yaml": "24b7f4494e1cc62fce747165fd904151d358bfcb87f147a0a50aef51cb7ae3a9",
     "projects/decodex/decisions/0001-supervised-self-improving-loop.json": "fae8d3cdf07170fc43cd35e7a5110008a89a43fc78ac5b9b3337348ae86aecad",
     "projects/decodex/decisions/2026-06-20-self-application-policy.yaml": "0a7802d742f4540c7cc3ba033489dd692d36cd86ebf1f261c122ef2326073ebb",
-    "projects/decodex/project.yaml": "dc881a997030c22840519c11a341851b3e0abf785064c027d40cbcf826ce36a0",
     "projects/decodex/skills/context-compliance-review/evaluations/2026-06-20-v0.1.4-evidence-based-skill-lifecycle/evaluation.yaml": "48dfc6e7bd147f3b85b7a970d7d066c81b4ac10cbffd55e837b6f4e20213eb46",
     "projects/decodex/skills/context-compliance-review/evaluations/source-eval/evaluation.yaml": "e91f6440126b540d2c6ec63003c6ac1386c347631b6b3e91d861260ee26ba7ba",
     "projects/decodex/skills/context-compliance-review/reviews/2026-06-20-v0.1.4-evidence-based-skill-lifecycle/review.yaml": "0e73a2c1bc063a0a1735d04e77da6a22414509ad9b5b04479ed431ff11896bf1",
-    "projects/decodex/skills/context-compliance-review/skill.yaml": "6151e3ed7864ee24b0b9e572ec6eb3996e538c00077b178caffb7ef5264405dd",
-    "projects/decodex/skills/context-compliance-review/versions/0.1.0/skill.yaml": "c4b66cc9849cb47d8ea8c68a84a8ea817ab13e07362306c3e81a6dfacf9d8f11",
+    "projects/pac-hunt-2/project.yaml": "f3f114d16ce08955941be00628324924c676035d114a4615d50211b63bc797bd",
     "projects/pac-hunt-2/sessions/2026-06-20-v0.1.5-cross-project-reuse/session.yaml": "8960cef1ba78fad890fedfff05a6ffd861c7e2a3cf83163438dae303758441aa",
     "projects/pac-hunt-2/sessions/2026-06-20-v0.1.5-cross-project-reuse/skill-applications/context-compliance-review--decodex--pac-hunt-2--2026-06-20-v0.1.5-cross-project-reuse--0.1.0/application.yaml": "d8bb91dc44bbc522e00cde2322d5d3ddafc95c857413a6e8c3836d5ba2628073",
     "projects/pac-hunt-2/sessions/2026-06-20-v0.1.5-cross-project-reuse/skill-applications/context-compliance-review--decodex--pac-hunt-2--2026-06-20-v0.1.5-cross-project-reuse--0.1.0/report.md": "6ec6fa7d718b66ffaad009bc3af75bcb8fa9d3313b7ff34cb142888759fb1542",
     "projects/pac-hunt-2/skills/context-compliance-review/evaluations/target-eval/evaluation.yaml": "2ba9d368fbbc25c9a445cf6606d66c53ac43e638a7d7e01c1774bdb300123ab2",
     "projects/pac-hunt-2/skills/context-compliance-review/reviews/cross-project-review/review.yaml": "eda677928fb5f9a3c434b0fd11f8882bfebf3b5b20b098fdd1374979cf8b8361",
+    "projects/pac-hunt-2/skills/context-compliance-review/skill.yaml": "647785c575a9f6f2d56ef61746a6cd9bd370ce0cd9a1877ef78dd4922f939fb4",
+    "projects/pac-hunt-2/skills/context-compliance-review/versions/0.1.0/skill.yaml": "647785c575a9f6f2d56ef61746a6cd9bd370ce0cd9a1877ef78dd4922f939fb4",
+    "projects/pac-hunt-2/skills/static-dynamic-render-split/skill.yaml": "118825babe4eee9573bb6aab770ab30e310fb464239a102e0b7519605f1ee28e",
     "registry/projects-index.yaml": "d4384be7910bd1b8835386100c6e7f82b3cae3afda53e2d58d40c16ef4487732",
     "registry/skills-index.yaml": "ca397df67d12b17c668641943a73080149f9906f99f90d276aaa73bb3ff93188"
   },

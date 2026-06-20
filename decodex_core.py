@@ -260,6 +260,12 @@ def validate_repository(root: Path) -> list[str]:
         except DecodexError as exc:
             errors.append(str(exc))
 
+    for application_path in _discover_skill_application_files(root):
+        try:
+            errors.extend(validate_json_schema_file(application_path, root / "schemas" / "skill-application.schema.json"))
+        except DecodexError as exc:
+            errors.append(str(exc))
+
     return errors
 
 
@@ -272,6 +278,7 @@ def audit_repository(root: Path) -> list[str]:
     errors.extend(_audit_sessions(root))
     errors.extend(_audit_promotions(root))
     errors.extend(_audit_skill_lifecycle(root))
+    errors.extend(_audit_skill_applications(root))
     errors.extend(_audit_absolute_paths(root))
     errors.extend(_audit_tracked_generated_files(root))
     errors.extend(_audit_evidence_references(root))
@@ -336,6 +343,17 @@ def _discover_skill_artifact_files(root: Path, artifact_kind: str) -> list[Path]
             for pattern in ("*.json", "*.yaml", "*.yml"):
                 for path in artifact_root.rglob(pattern):
                     files.append(path)
+    return sorted({path.resolve() for path in files})
+
+
+def _discover_skill_application_files(root: Path) -> list[Path]:
+    files: list[Path] = []
+    projects_dir = root / "projects"
+    if not projects_dir.exists():
+        return files
+    for path in projects_dir.rglob("skill-applications/*/application.yaml"):
+        if path.is_file():
+            files.append(path)
     return sorted({path.resolve() for path in files})
 
 
@@ -452,6 +470,137 @@ def promote_skill(
     return source_dir, final_target
 
 
+def skill_apply(
+    root: Path,
+    *,
+    skill_id: str,
+    from_project: str,
+    to_project: str,
+    session: str,
+) -> tuple[Path, Path]:
+    source_project_dir = root / "projects" / from_project
+    target_project_dir = root / "projects" / to_project
+    source_project_file = source_project_dir / "project.yaml"
+    target_project_file = target_project_dir / "project.yaml"
+    if not source_project_file.exists():
+        raise DecodexError(f"source project not found: {source_project_file}")
+    if not target_project_file.exists():
+        raise DecodexError(f"target project not found: {target_project_file}")
+
+    source_skill_dir = source_project_dir / "skills" / skill_id
+    source_skill_file = source_skill_dir / "skill.yaml"
+    if not source_skill_file.exists():
+        raise DecodexError(f"source skill not found: {source_skill_file}")
+
+    source_skill = _safe_load_skill(source_skill_file)
+    source_version = source_skill.get("version")
+    if not isinstance(source_version, str) or not source_version:
+        raise DecodexError(f"missing skill version: {source_skill_file}")
+
+    application_id = _application_id(skill_id, from_project, to_project, session, source_version)
+    application_dir = ensure_within_root(
+        root,
+        target_project_dir / "sessions" / session / "skill-applications" / application_id,
+    )
+    target_skill_dir = target_project_dir / "skills" / skill_id
+    if application_dir.exists():
+        raise DecodexError(f"application already exists: {application_dir}")
+    if target_skill_dir.exists():
+        raise DecodexError(f"target skill already exists: {target_skill_dir}")
+    application_dir.mkdir(parents=True, exist_ok=False)
+    target_skill_dir.mkdir(parents=True, exist_ok=False)
+    source_hash = _sha256_file(source_skill_file)
+
+    target_skill = dict(source_skill)
+    target_skill["scope"] = "project"
+    target_skill["origin_project"] = source_skill.get("origin_project", from_project)
+    origin_projects = target_skill.get("origin_projects")
+    if isinstance(origin_projects, list):
+        deduped_origin_projects = [value for value in origin_projects if isinstance(value, str) and value]
+    else:
+        deduped_origin_projects = [target_skill["origin_project"]] if isinstance(target_skill.get("origin_project"), str) else []
+    if from_project not in deduped_origin_projects:
+        deduped_origin_projects.append(from_project)
+    target_skill["origin_projects"] = deduped_origin_projects
+    target_skill["application"] = {
+        "id": application_id,
+        "source_project": from_project,
+        "target_project": to_project,
+        "session": session,
+        "source_hash": source_hash,
+        "source_skill_path": source_skill_file.relative_to(root).as_posix(),
+    }
+    dump_jsonish(target_skill_dir / "skill.yaml", target_skill)
+    source_skill_markdown = source_skill_dir / "SKILL.md"
+    if source_skill_markdown.exists():
+        shutil.copy2(source_skill_markdown, target_skill_dir / "SKILL.md")
+    snapshot_dir = _skill_version_snapshot_dir(target_skill_dir, source_version)
+    snapshot_dir.mkdir(parents=True, exist_ok=True)
+    dump_jsonish(snapshot_dir / "skill.yaml", target_skill)
+    latest_review, latest_review_path = _latest_skill_artifact(source_skill_dir, "reviews")
+    latest_evaluation, latest_evaluation_path = _latest_skill_artifact(source_skill_dir, "evaluations")
+    application = {
+        "id": application_id,
+        "skill_id": skill_id,
+        "skill_title": source_skill.get("title", skill_id),
+        "skill_version": source_version,
+        "source_project": from_project,
+        "target_project": to_project,
+        "session": session,
+        "status": "applied",
+        "source_skill_path": source_skill_file.relative_to(root).as_posix(),
+        "source_hash": source_hash,
+        "source_confidence": source_skill.get("confidence", "unknown"),
+        "source_recommendation": source_skill.get("recommendation", "unknown"),
+        "source_status": source_skill.get("status", "unknown"),
+        "applied_at": datetime.now(timezone.utc).isoformat(),
+        "target_context_path": (target_project_dir / ".codex").relative_to(root).as_posix(),
+        "report_path": (application_dir / "report.md").relative_to(root).as_posix(),
+        "latest_review_id": latest_review.get("id") if isinstance(latest_review, dict) else None,
+        "latest_review_path": latest_review_path.relative_to(root).as_posix() if latest_review_path else None,
+        "latest_evaluation_id": latest_evaluation.get("id") if isinstance(latest_evaluation, dict) else None,
+        "latest_evaluation_path": latest_evaluation_path.relative_to(root).as_posix() if latest_evaluation_path else None,
+        "source_origin": source_skill.get("origin_project", from_project),
+    }
+    dump_jsonish(application_dir / "application.yaml", application)
+
+    report_lines = [
+        "# Skill Application",
+        "",
+        f"- id: {application_id}",
+        f"- skill_id: {skill_id}",
+        f"- skill_version: {source_version}",
+        f"- source_project: {from_project}",
+        f"- target_project: {to_project}",
+        f"- session: {session}",
+        f"- status: applied",
+        f"- source_hash: {source_hash}",
+        f"- target_context: {application['target_context_path']}",
+        "",
+        "## Source Skill",
+        f"- path: {application['source_skill_path']}",
+        f"- title: {application['skill_title']}",
+        f"- confidence: {application['source_confidence']}",
+        f"- recommendation: {application['source_recommendation']}",
+        "",
+    ]
+    write_template_text(application_dir / "report.md", "\n".join(report_lines), force=True)
+
+    build_context(root, project=to_project, output_root=target_project_dir)
+    return application_dir / "application.yaml", application_dir / "report.md"
+
+
+def _application_id(skill_id: str, from_project: str, to_project: str, session: str, version: str) -> str:
+    parts = [_slugify(piece) for piece in [skill_id, from_project, to_project, session, version]]
+    return "--".join(parts)
+
+
+def _slugify(value: str) -> str:
+    slug = re.sub(r"[^A-Za-z0-9._-]+", "-", value.strip())
+    slug = re.sub(r"-+", "-", slug).strip("-")
+    return slug or "item"
+
+
 def _skill_dir(root: Path, skill_id: str, scope: str, *, project: str | None) -> Path:
     if scope == "global":
         return root / "global" / "skills" / skill_id
@@ -497,6 +646,23 @@ def _skill_evaluation_ids(skill_dir: Path) -> list[str]:
             if isinstance(evaluation_id, str) and evaluation_id:
                 ids.append(evaluation_id)
     return ids
+
+
+def _skill_evaluation_ids_for_skill(root: Path, skill_id: str) -> list[str]:
+    ids: list[str] = []
+    for evaluation_file in _discover_skill_artifact_files(root, "evaluations"):
+        try:
+            evaluation = load_jsonish(evaluation_file)
+        except DecodexError:
+            continue
+        if not isinstance(evaluation, dict):
+            continue
+        if evaluation.get("skill_id") != skill_id:
+            continue
+        evaluation_id = evaluation.get("id")
+        if isinstance(evaluation_id, str) and evaluation_id:
+            ids.append(evaluation_id)
+    return sorted(dict.fromkeys(ids))
 
 
 def _latest_skill_artifact(skill_dir: Path, folder: str) -> tuple[dict[str, Any] | None, Path | None]:
@@ -626,8 +792,76 @@ def _list_skill_records(root: Path, base: Path) -> list[dict[str, Any]]:
     return records
 
 
+def _list_applied_skill_records(root: Path, project: str) -> list[dict[str, Any]]:
+    records: list[dict[str, Any]] = []
+    project_root = root / "projects" / project
+    if not project_root.exists():
+        return records
+    for application_file in sorted(project_root.rglob("skill-applications/*/application.yaml")):
+        try:
+            application = load_jsonish(application_file)
+        except DecodexError:
+            continue
+        if not isinstance(application, dict):
+            continue
+        skill_id = application.get("skill_id")
+        skill_version = application.get("skill_version")
+        source_project = application.get("source_project")
+        target_project = application.get("target_project")
+        if not isinstance(skill_id, str) or not skill_id:
+            continue
+        source_skill_file = (
+            root / application.get("source_skill_path", "")
+            if isinstance(application.get("source_skill_path"), str)
+            else root / "projects" / str(source_project) / "skills" / skill_id / "skill.yaml"
+        )
+        source_skill = _safe_load_skill(source_skill_file) if source_skill_file.exists() else {}
+        latest_review, latest_review_path = _latest_skill_artifact(source_skill_file.parent, "reviews") if source_skill_file.exists() else (None, None)
+        latest_evaluation, latest_evaluation_path = _latest_skill_artifact(source_skill_file.parent, "evaluations") if source_skill_file.exists() else (None, None)
+        records.append(
+            {
+                "id": skill_id,
+                "title": source_skill.get("title", application.get("skill_title", skill_id)),
+                "origin_project": source_project if isinstance(source_project, str) else source_skill.get("origin_project", "unknown"),
+                "target_project": target_project if isinstance(target_project, str) else project,
+                "version": skill_version if isinstance(skill_version, str) else source_skill.get("version", "unknown"),
+                "status": source_skill.get("status", application.get("status", "unknown")),
+                "confidence": source_skill.get("confidence", application.get("source_confidence", "unknown")),
+                "recommendation": source_skill.get("recommendation", application.get("source_recommendation", "unknown")),
+                "application": {
+                    "id": application.get("id"),
+                    "path": application_file.relative_to(root).as_posix(),
+                    "report": application.get("report_path"),
+                    "status": application.get("status", "unknown"),
+                    "source_hash": application.get("source_hash"),
+                    "source_skill_path": application.get("source_skill_path"),
+                },
+                "source_hash": application.get("source_hash"),
+                "source_skill_path": application.get("source_skill_path"),
+                "session": application.get("session"),
+                "latest_review": {
+                    "id": latest_review.get("id"),
+                    "recommendation": latest_review.get("recommendation"),
+                    "approved_by": latest_review.get("approved_by"),
+                    "path": latest_review_path.relative_to(root).as_posix() if latest_review_path else None,
+                }
+                if latest_review
+                else None,
+                "latest_evaluation": {
+                    "id": latest_evaluation.get("id"),
+                    "recommendation": latest_evaluation.get("recommendation"),
+                    "path": latest_evaluation_path.relative_to(root).as_posix() if latest_evaluation_path else None,
+                }
+                if latest_evaluation
+                else None,
+            }
+        )
+    return records
+
+
 def _build_context_bundle(root: Path, project: str) -> dict[str, Any]:
     project_skills = _list_skill_records(root, root / "projects" / project / "skills")
+    applied_project_skills = _list_applied_skill_records(root, project)
     inherited_skills = _list_skill_records(root, root / "global" / "skills")
     decisions = _list_decision_records(root, project)
     source_refs = _collect_context_sources(root, project)
@@ -672,6 +906,7 @@ def _build_context_bundle(root: Path, project: str) -> dict[str, Any]:
         ],
         "decisions": decisions,
         "project_skills": project_skills,
+        "applied_project_skills": applied_project_skills,
         "inherited_skills": inherited_skills,
         "source_files": source_refs,
         "source_hashes": source_hashes,
@@ -681,6 +916,7 @@ def _build_context_bundle(root: Path, project: str) -> dict[str, Any]:
 def _render_context_files(bundle: dict[str, Any]) -> dict[str, str]:
     project = bundle["project"]
     project_skills = bundle["project_skills"]
+    applied_project_skills = bundle["applied_project_skills"]
     inherited_skills = bundle["inherited_skills"]
     decisions = bundle["decisions"]
     security_rules = bundle["security_rules"]
@@ -740,6 +976,20 @@ def _render_context_files(bundle: dict[str, Any]) -> dict[str, str]:
                 f"status={skill.get('status', 'unknown')} | origin={skill.get('origin_project', 'unknown')} | "
                 f"confidence={skill.get('confidence', 'unknown')} | recommendation={skill.get('recommendation', 'unknown')} | "
                 f"review={latest_review.get('id', 'none')} | evaluation={latest_evaluation.get('id', 'none')}"
+            )
+    else:
+        project_context.append("- None")
+    project_context.extend([
+        "",
+        "## Applied Project Skills",
+    ])
+    if applied_project_skills:
+        for skill in applied_project_skills:
+            application = skill.get("application") or {}
+            project_context.append(
+                f"- {skill['id']} | origin={skill.get('origin_project', 'unknown')} | version={skill.get('version', 'unknown')} | "
+                f"confidence={skill.get('confidence', 'unknown')} | recommendation={skill.get('recommendation', 'unknown')} | "
+                f"application={application.get('id', 'unknown')} | path={application.get('path', 'unknown')}"
             )
     else:
         project_context.append("- None")
@@ -809,6 +1059,22 @@ def _collect_context_sources(root: Path, project: str) -> list[dict[str, Any]]:
     source_paths.extend(_discover_skill_artifact_files(root, "evaluations"))
     source_paths.extend(_discover_skill_artifact_files(root, "reviews"))
     source_paths.extend(_discover_skill_artifact_files(root, "revisions"))
+    application_files = _discover_skill_application_files(root)
+    source_paths.extend(application_files)
+    for application_file in application_files:
+        try:
+            application = load_jsonish(application_file)
+        except DecodexError:
+            continue
+        if not isinstance(application, dict):
+            continue
+        report_path = application.get("report_path")
+        if isinstance(report_path, str) and report_path:
+            source_paths.append(root / report_path)
+        session = application.get("session")
+        target_project = application.get("target_project")
+        if isinstance(session, str) and session and isinstance(target_project, str) and target_project:
+            source_paths.append(root / "projects" / target_project / "sessions" / session / "session.yaml")
     refs: list[dict[str, Any]] = []
     for path in source_paths:
         if not path.exists() or not path.is_file():
@@ -927,6 +1193,12 @@ def context_check(root: Path, *, project: str, context_root: Path | None = None)
     else:
         errors.append(f"{context_dir / 'provenance.json'}: inherited_skills must be a list")
 
+    applied_skills = provenance.get("applied_project_skills", [])
+    if isinstance(applied_skills, list):
+        errors.extend(_check_applied_project_skills(root, project, applied_skills))
+    else:
+        errors.append(f"{context_dir / 'provenance.json'}: applied_project_skills must be a list")
+
     return sorted(dict.fromkeys(errors))
 
 
@@ -949,6 +1221,59 @@ def _check_context_skills(root: Path, skills: list[dict[str, Any]]) -> list[str]
             continue
         if not isinstance(skill_id, str) or not skill_id:
             errors.append(f"invalid skill reference in context provenance: {source_path}")
+    return errors
+
+
+def _check_applied_project_skills(root: Path, project: str, skills: list[dict[str, Any]]) -> list[str]:
+    errors: list[str] = []
+    seen_applications: set[str] = set()
+    for skill in skills:
+        if not isinstance(skill, dict):
+            errors.append("context provenance contains a non-object applied skill record")
+            continue
+        skill_id = skill.get("id")
+        version = skill.get("version")
+        application = skill.get("application", {})
+        source_skill_path = skill.get("source_skill_path")
+        source_hash = skill.get("source_hash")
+        origin_project = skill.get("origin_project")
+        target_project = skill.get("target_project")
+        application_id = application.get("id") if isinstance(application, dict) else None
+        application_path = application.get("path") if isinstance(application, dict) else None
+        if not isinstance(skill_id, str) or not skill_id:
+            errors.append("applied skill missing id")
+            continue
+        if not isinstance(version, str) or not version:
+            errors.append(f"applied skill {skill_id} missing version")
+        if not isinstance(source_skill_path, str) or not source_skill_path:
+            errors.append(f"applied skill {skill_id} missing source_skill_path")
+            continue
+        if not isinstance(source_hash, str) or not source_hash:
+            errors.append(f"applied skill {skill_id} missing source_hash")
+            continue
+        source_file = root / source_skill_path
+        if not source_file.exists():
+            errors.append(f"applied skill {skill_id} missing source file: {source_skill_path}")
+            continue
+        if _sha256_file(source_file) != source_hash:
+            errors.append(f"applied skill {skill_id} has stale source hash: {source_skill_path}")
+        source_skill = _safe_load_skill(source_file)
+        if isinstance(origin_project, str) and source_skill.get("origin_project") not in {origin_project, project}:
+            errors.append(f"applied skill {skill_id} origin project mismatch")
+        if isinstance(target_project, str) and target_project != project:
+            errors.append(f"applied skill {skill_id} target project mismatch")
+        if isinstance(version, str) and source_skill.get("version") != version:
+            errors.append(f"applied skill {skill_id} version mismatch")
+        if isinstance(application_id, str) and application_id:
+            if application_id in seen_applications:
+                errors.append(f"duplicate application id in context provenance: {application_id}")
+            seen_applications.add(application_id)
+        if isinstance(application_path, str) and application_path:
+            application_file = root / application_path
+            if not application_file.exists():
+                errors.append(f"applied skill {skill_id} missing application artifact: {application_path}")
+            elif not application_path.startswith(f"projects/{project}/sessions/"):
+                errors.append(f"applied skill {skill_id} application is outside project session scope: {application_path}")
     return errors
 
 
@@ -1344,6 +1669,9 @@ def _render_skill_evaluation(evaluation: dict[str, Any]) -> str:
         "",
         "## Evidence",
     ]
+    for field in ["application_id", "application_path", "source_project", "target_project", "session"]:
+        if evaluation.get(field) is not None:
+            lines.append(f"- {field}: {evaluation.get(field)}")
     for evidence in evaluation.get("evidence", []):
         lines.append(f"- {evidence}")
     lines.append("")
@@ -1359,13 +1687,38 @@ def _render_skill_review(review: dict[str, Any]) -> str:
         f"- skill_version: {review['skill_version']}",
         f"- recommendation: {review['recommendation']}",
         f"- approved_by: {review.get('approved_by') or 'none'}",
+        f"- projects_tested: {', '.join(review.get('projects_tested', [])) or 'none'}",
+        f"- independent_projects: {review.get('independent_projects', 0)}",
+        f"- applications_considered: {review.get('applications_considered', 0)}",
+        f"- cross_project_reuse: {review.get('cross_project_reuse', False)}",
         "",
         "## Evaluation IDs",
     ]
     for evaluation_id in review.get("evaluation_ids", []):
         lines.append(f"- {evaluation_id}")
+    if review.get("divergences"):
+        lines.extend(["", "## Divergences"])
+        for divergence in review.get("divergences", []):
+            lines.append(f"- {divergence}")
+    if review.get("contradictions"):
+        lines.extend(["", "## Contradictions"])
+        for contradiction in review.get("contradictions", []):
+            lines.append(f"- {contradiction}")
     lines.append("")
     return "\n".join(lines)
+
+
+def _find_skill_evaluation_file(root: Path, skill_id: str, evaluation_id: str) -> Path:
+    for evaluation_file in _discover_skill_artifact_files(root, "evaluations"):
+        if evaluation_file.parent.name != evaluation_id:
+            continue
+        try:
+            evaluation = load_jsonish(evaluation_file)
+        except DecodexError:
+            continue
+        if isinstance(evaluation, dict) and evaluation.get("skill_id") == skill_id:
+            return evaluation_file
+    return root / "__missing__" / skill_id / "evaluations" / evaluation_id / "evaluation.yaml"
 
 
 def skill_evaluate(
@@ -1381,6 +1734,11 @@ def skill_evaluate(
     notes: list[str] | None = None,
     runs: int = 1,
     successful_runs: int | None = None,
+    session: str | None = None,
+    application_id: str | None = None,
+    application_path: str | None = None,
+    source_project: str | None = None,
+    target_project: str | None = None,
 ) -> Path:
     skill_dir = _skill_dir(root, skill_id, scope, project=project if scope == "project" else None)
     skill_file = skill_dir / "skill.yaml"
@@ -1395,7 +1753,7 @@ def skill_evaluate(
         "skill_id": skill_id,
         "skill_version": skill_version,
         "project": project,
-        "session": evaluation_id,
+        "session": session or evaluation_id,
         "status": "passed",
         "runs": runs,
         "successful_runs": successful_runs if successful_runs is not None else runs,
@@ -1405,6 +1763,14 @@ def skill_evaluate(
         "contradictions": [],
         "notes": notes or [],
     }
+    if application_id is not None:
+        evaluation["application_id"] = application_id
+    if application_path is not None:
+        evaluation["application_path"] = application_path
+    if source_project is not None:
+        evaluation["source_project"] = source_project
+    if target_project is not None:
+        evaluation["target_project"] = target_project
     dump_jsonish(evaluation_dir / "evaluation.yaml", evaluation)
     write_template_text(evaluation_dir / "evaluation.md", _render_skill_evaluation(evaluation), force=True)
     return evaluation_dir / "evaluation.yaml"
@@ -1431,6 +1797,60 @@ def skill_review(
     skill_version = skill_data.get("version", "0.1.0")
     review_dir = skill_dir / "reviews" / review_id
     review_dir.mkdir(parents=True, exist_ok=False)
+    evaluations: list[dict[str, Any]] = []
+    if evaluation_ids:
+        for evaluation_id in evaluation_ids:
+            evaluation_file = _find_skill_evaluation_file(root, skill_id, evaluation_id)
+            if not evaluation_file.exists():
+                raise DecodexError(f"missing evaluation for review: {evaluation_file}")
+            evaluation = _safe_load_skill(evaluation_file)
+            evaluations.append(evaluation)
+    projects_tested = sorted(
+        {
+            str(evaluation.get("project"))
+            for evaluation in evaluations
+            if isinstance(evaluation.get("project"), str) and evaluation.get("project")
+        }
+    )
+    application_ids = sorted(
+        {
+            str(evaluation.get("application_id"))
+            for evaluation in evaluations
+            if isinstance(evaluation.get("application_id"), str) and evaluation.get("application_id")
+        }
+    )
+    applications_considered = max(len(evaluations), len(application_ids))
+    independent_projects = len(projects_tested)
+    cross_project_reuse = independent_projects > 1
+    versions_tested = sorted(
+        {
+            str(evaluation.get("skill_version"))
+            for evaluation in evaluations
+            if isinstance(evaluation.get("skill_version"), str) and evaluation.get("skill_version")
+        }
+    )
+    divergences: list[str] = []
+    contradictions: list[str] = []
+    if len(versions_tested) > 1:
+        divergences.append(f"skill versions observed: {', '.join(versions_tested)}")
+    confidence_levels = sorted(
+        {
+            str(evaluation.get("confidence"))
+            for evaluation in evaluations
+            if isinstance(evaluation.get("confidence"), str) and evaluation.get("confidence")
+        }
+    )
+    if len(confidence_levels) > 1:
+        divergences.append(f"confidence levels observed: {', '.join(confidence_levels)}")
+    recommendations = sorted(
+        {
+            str(evaluation.get("recommendation"))
+            for evaluation in evaluations
+            if isinstance(evaluation.get("recommendation"), str) and evaluation.get("recommendation")
+        }
+    )
+    if len(recommendations) > 1:
+        contradictions.append(f"conflicting recommendations: {', '.join(recommendations)}")
     review = {
         "id": review_id,
         "skill_id": skill_id,
@@ -1442,6 +1862,12 @@ def skill_review(
         "confidence": confidence,
         "evidence": [],
         "notes": notes or [],
+        "projects_tested": projects_tested,
+        "independent_projects": independent_projects,
+        "applications_considered": applications_considered,
+        "cross_project_reuse": cross_project_reuse,
+        "divergences": divergences,
+        "contradictions": contradictions,
     }
     if approved_by is not None:
         review["approved_by"] = approved_by
@@ -1658,7 +2084,10 @@ def _audit_duplicate_skill_ids(root: Path) -> list[str]:
         if len(files) <= 1:
             continue
         scopes = {_skill_scope_for_path(root, file) for file in files}
-        if scopes == {"project", "global"} and len(files) == 2 and _has_matching_promotion_event(root, skill_id, files):
+        if len(files) == 2 and (
+            (scopes == {"project", "global"} and _has_matching_promotion_event(root, skill_id, files))
+            or (scopes == {"project"} and _has_matching_application_event(root, skill_id, files))
+        ):
             continue
         errors.append(f"duplicate skill id {skill_id}: " + ", ".join(str(path) for path in files))
     return errors
@@ -1693,6 +2122,29 @@ def _has_matching_promotion_event(root: Path, skill_id: str, files: list[Path]) 
         if event.get("skill_id") != skill_id:
             continue
         if event.get("source_path") == source_path and event.get("target_path") == target_path:
+            return True
+    return False
+
+
+def _has_matching_application_event(root: Path, skill_id: str, files: list[Path]) -> bool:
+    application_files = _discover_skill_application_files(root)
+    if not application_files:
+        return False
+    project_files = [path.relative_to(root).as_posix() for path in files if _skill_scope_for_path(root, path) == "project"]
+    if len(project_files) != 2:
+        return False
+    for application_path in application_files:
+        try:
+            application = load_jsonish(application_path)
+        except DecodexError:
+            continue
+        if not isinstance(application, dict):
+            continue
+        if application.get("skill_id") != skill_id:
+            continue
+        source_relative = application.get("source_skill_path")
+        target_relative = f"projects/{application.get('target_project')}/skills/{skill_id}/skill.yaml"
+        if isinstance(source_relative, str) and source_relative in project_files and target_relative in project_files:
             return True
     return False
 
@@ -1888,16 +2340,7 @@ def _audit_skill_lifecycle(root: Path) -> list[str]:
 
         review_root = skill_dir / "reviews"
         if review_root.exists():
-            evaluation_ids: set[str] = set()
-            for evaluation_file in sorted(evaluation_root.rglob("evaluation.yaml")) if evaluation_root.exists() else []:
-                try:
-                    evaluation = load_jsonish(evaluation_file)
-                except DecodexError:
-                    continue
-                if isinstance(evaluation, dict):
-                    evaluation_id = evaluation.get("id")
-                    if isinstance(evaluation_id, str) and evaluation_id:
-                        evaluation_ids.add(evaluation_id)
+            evaluation_ids = set(_skill_evaluation_ids_for_skill(root, skill_id))
             for review_file in sorted(review_root.rglob("review.yaml")):
                 try:
                     review = load_jsonish(review_file)
@@ -1938,6 +2381,116 @@ def _audit_skill_lifecycle(root: Path) -> list[str]:
     return errors
 
 
+def _audit_skill_applications(root: Path) -> list[str]:
+    errors: list[str] = []
+    seen_ids: dict[str, list[Path]] = {}
+    application_records: dict[str, dict[str, Any]] = {}
+
+    for application_file in _discover_skill_application_files(root):
+        try:
+            application = load_jsonish(application_file)
+        except DecodexError as exc:
+            errors.append(str(exc))
+            continue
+        if not isinstance(application, dict):
+            continue
+
+        application_id = application.get("id")
+        skill_id = application.get("skill_id")
+        skill_version = application.get("skill_version")
+        source_project = application.get("source_project")
+        target_project = application.get("target_project")
+        session = application.get("session")
+        source_skill_path = application.get("source_skill_path")
+        source_hash = application.get("source_hash")
+        status = application.get("status")
+        report_path = application.get("report_path")
+
+        if isinstance(application_id, str) and application_id:
+            seen_ids.setdefault(application_id, []).append(application_file)
+            application_records[application_id] = application
+        else:
+            errors.append(f"{application_file}: missing application id")
+
+        if not isinstance(skill_id, str) or not skill_id:
+            errors.append(f"{application_file}: missing skill_id")
+            continue
+        if not isinstance(skill_version, str) or not skill_version:
+            errors.append(f"{application_file}: missing skill_version")
+        if not isinstance(source_project, str) or not source_project:
+            errors.append(f"{application_file}: missing source_project")
+        if not isinstance(target_project, str) or not target_project:
+            errors.append(f"{application_file}: missing target_project")
+        if not isinstance(session, str) or not session:
+            errors.append(f"{application_file}: missing session")
+        if status != "applied":
+            errors.append(f"{application_file}: application status must remain applied")
+        if not isinstance(source_skill_path, str) or not source_skill_path:
+            errors.append(f"{application_file}: missing source_skill_path")
+            continue
+        if not isinstance(source_hash, str) or not source_hash:
+            errors.append(f"{application_file}: missing source_hash")
+            continue
+
+        source_skill_file = root / source_skill_path
+        if not source_skill_file.exists():
+            errors.append(f"{application_file}: missing source skill file {source_skill_path}")
+            continue
+        if _sha256_file(source_skill_file) != source_hash:
+            errors.append(f"{application_file}: source hash mismatch for {source_skill_path}")
+        source_skill = _safe_load_skill(source_skill_file)
+        if source_skill.get("id") != skill_id:
+            errors.append(f"{application_file}: source skill id mismatch")
+        if source_skill.get("version") != skill_version:
+            errors.append(f"{application_file}: source skill version mismatch")
+        if source_skill.get("scope") != "project":
+            errors.append(f"{application_file}: source skill scope must remain project scoped")
+        if source_project == "global" or target_project == "global":
+            errors.append(f"{application_file}: implicit global promotion is not allowed")
+
+        expected_session_dir = root / "projects" / str(target_project) / "sessions" / str(session)
+        if not application_file.is_relative_to(expected_session_dir):
+            errors.append(f"{application_file}: application is not stored under the declared session")
+
+        if isinstance(report_path, str) and report_path:
+            report_file = root / report_path
+            if not report_file.exists():
+                errors.append(f"{application_file}: missing application report {report_path}")
+
+    for application_id, files in seen_ids.items():
+        if len(files) > 1:
+            errors.append(f"duplicate application id {application_id}: " + ", ".join(str(path) for path in files))
+
+    evaluation_applications: dict[str, list[Path]] = {}
+    for evaluation_file in _discover_skill_artifact_files(root, "evaluations"):
+        try:
+            evaluation = load_jsonish(evaluation_file)
+        except DecodexError:
+            continue
+        if not isinstance(evaluation, dict):
+            continue
+        application_id = evaluation.get("application_id")
+        if not isinstance(application_id, str) or not application_id:
+            continue
+        evaluation_applications.setdefault(application_id, []).append(evaluation_file)
+        application = application_records.get(application_id)
+        if application is None:
+            errors.append(f"{evaluation_file}: references missing application {application_id}")
+            continue
+        if evaluation.get("skill_id") != application.get("skill_id"):
+            errors.append(f"{evaluation_file}: application skill mismatch for {application_id}")
+        if evaluation.get("skill_version") != application.get("skill_version"):
+            errors.append(f"{evaluation_file}: application version mismatch for {application_id}")
+        if evaluation.get("project") != application.get("target_project"):
+            errors.append(f"{evaluation_file}: application target project mismatch for {application_id}")
+
+    for application_id, application in application_records.items():
+        if application_id in evaluation_applications and application.get("status") != "applied":
+            errors.append(f"application {application_id} must remain applied after evaluation")
+
+    return errors
+
+
 def _project_ids(root: Path) -> set[str]:
     ids: set[str] = set()
     for project_file in _discover_project_files(root):
@@ -1966,7 +2519,7 @@ def init_workspace(root: Path, *, force: bool = False) -> list[Path]:
     json_templates = {
         "decodex.yaml": {
             "name": "Decodex",
-            "version": "0.1.4",
+            "version": "0.1.5",
             "status": "mvp",
             "runtime": {"python_candidates": ["python", "python3"]},
             "layers": {
@@ -2065,6 +2618,47 @@ def init_workspace(root: Path, *, force: bool = False) -> list[Path]:
                 "project": {"type": "string"},
                 "summary": {"type": "string"},
                 "status": {"type": "string"},
+            },
+            "additionalProperties": True,
+        },
+        "schemas/skill-application.schema.json": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "title": "Decodex Skill Application",
+            "x-decodex-version": "0.1.5",
+            "type": "object",
+            "required": [
+                "id",
+                "skill_id",
+                "skill_version",
+                "source_project",
+                "target_project",
+                "session",
+                "status",
+                "source_skill_path",
+                "source_hash",
+            ],
+            "properties": {
+                "id": {"type": "string"},
+                "skill_id": {"type": "string"},
+                "skill_title": {"type": "string"},
+                "skill_version": {"type": "string"},
+                "source_project": {"type": "string"},
+                "target_project": {"type": "string"},
+                "session": {"type": "string"},
+                "status": {"type": "string"},
+                "source_skill_path": {"type": "string"},
+                "source_hash": {"type": "string"},
+                "source_confidence": {"type": "string"},
+                "source_recommendation": {"type": "string"},
+                "source_status": {"type": "string"},
+                "source_origin": {"type": "string"},
+                "applied_at": {"type": "string"},
+                "target_context_path": {"type": "string"},
+                "report_path": {"type": "string"},
+                "latest_review_id": {"type": "string"},
+                "latest_review_path": {"type": "string"},
+                "latest_evaluation_id": {"type": "string"},
+                "latest_evaluation_path": {"type": "string"},
             },
             "additionalProperties": True,
         },

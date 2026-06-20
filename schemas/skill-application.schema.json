@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Decodex Skill Application",
+  "x-decodex-version": "0.1.5",
+  "type": "object",
+  "required": [
+    "id",
+    "skill_id",
+    "skill_version",
+    "source_project",
+    "target_project",
+    "session",
+    "status",
+    "source_skill_path",
+    "source_hash"
+  ],
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "skill_id": {
+      "type": "string"
+    },
+    "skill_title": {
+      "type": "string"
+    },
+    "skill_version": {
+      "type": "string"
+    },
+    "source_project": {
+      "type": "string"
+    },
+    "target_project": {
+      "type": "string"
+    },
+    "session": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string"
+    },
+    "source_skill_path": {
+      "type": "string"
+    },
+    "source_hash": {
+      "type": "string"
+    },
+    "source_confidence": {
+      "type": "string"
+    },
+    "source_recommendation": {
+      "type": "string"
+    },
+    "source_status": {
+      "type": "string"
+    },
+    "source_origin": {
+      "type": "string"
+    },
+    "applied_at": {
+      "type": "string"
+    },
+    "target_context_path": {
+      "type": "string"
+    },
+    "report_path": {
+      "type": "string"
+    },
+    "latest_review_id": {
+      "type": "string"
+    },
+    "latest_review_path": {
+      "type": "string"
+    },
+    "latest_evaluation_id": {
+      "type": "string"
+    },
+    "latest_evaluation_path": {
+      "type": "string"
+    }
+  },
+  "additionalProperties": true
+}

@@ -1,0 +1,27 @@
+{
+  "id": "cross-project-review",
+  "skill_id": "context-compliance-review",
+  "skill_version": "0.1.0",
+  "project": "pac-hunt-2",
+  "reviewer": "decodex",
+  "evaluation_ids": [
+    "source-eval",
+    "target-eval"
+  ],
+  "recommendation": "continue_evaluation",
+  "confidence": "low",
+  "evidence": [],
+  "notes": [
+    "reuse remains deliberately cautious"
+  ],
+  "projects_tested": [
+    "decodex",
+    "pac-hunt-2"
+  ],
+  "independent_projects": 2,
+  "applications_considered": 2,
+  "cross_project_reuse": true,
+  "divergences": [],
+  "contradictions": [],
+  "approved_by": "human-reviewer"
+}

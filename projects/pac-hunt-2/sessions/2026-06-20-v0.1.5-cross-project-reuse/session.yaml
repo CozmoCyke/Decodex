@@ -1,0 +1,10 @@
+{
+  "id": "2026-06-20-v0.1.5-cross-project-reuse",
+  "project": "pac-hunt-2",
+  "date": "2026-06-20",
+  "goal": "Apply the Decodex skill to Pac-Hunt 2 without changing the source skill.",
+  "artifacts": [
+    "compliance-report.md",
+    "feedback.yaml"
+  ]
+}

@@ -15,4 +15,7 @@
 - decodex-self-application-policy | validated | Decodex must use its own capture, validation, audit, promotion, context, and provenance mechanisms throughout its development.
 
 ## Project Skills
-- context-compliance-review | Context Compliance Review | version=0.1.0 | status=candidate | origin=decodex | confidence=low | recommendation=continue_evaluation | review=2026-06-20-v0.1.4-evidence-based-skill-lifecycle-review | evaluation=2026-06-20-v0.1.4-evidence-based-skill-lifecycle
+- context-compliance-review | Context Compliance Review | version=0.1.0 | status=candidate | origin=decodex | confidence=low | recommendation=continue_evaluation | review=2026-06-20-v0.1.4-evidence-based-skill-lifecycle-review | evaluation=source-eval
+
+## Applied Project Skills
+- None

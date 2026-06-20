@@ -18,6 +18,7 @@ from decodex_core import (
     init_project,
     init_workspace,
     promote_skill,
+    skill_apply,
     context_check,
     skill_diff,
     skill_evaluate,
@@ -156,6 +157,14 @@ def build_parser() -> argparse.ArgumentParser:
     skill_diff_parser.add_argument("--right-version", required=True)
     skill_diff_parser.add_argument("--scope", default="project", choices=["project", "global"])
     skill_diff_parser.set_defaults(command="skill-diff")
+
+    skill_apply_parser = subparsers.add_parser("skill-apply")
+    skill_apply_parser.add_argument("--root", default=default_root(), type=Path)
+    skill_apply_parser.add_argument("--skill", required=True)
+    skill_apply_parser.add_argument("--from-project", required=True)
+    skill_apply_parser.add_argument("--to-project", required=True)
+    skill_apply_parser.add_argument("--session", required=True)
+    skill_apply_parser.set_defaults(command="skill-apply")
 
     return parser
 
@@ -321,6 +330,18 @@ def main(argv: list[str] | None = None) -> int:
                     scope=args.scope,
                 )
             )
+            return 0
+
+        if args.command == "skill-apply":
+            application_path, report_path = skill_apply(
+                root,
+                skill_id=args.skill,
+                from_project=args.from_project,
+                to_project=args.to_project,
+                session=args.session,
+            )
+            print(application_path)
+            print(report_path)
             return 0
 
         raise DecodexError(f"unknown command: {args.command}")

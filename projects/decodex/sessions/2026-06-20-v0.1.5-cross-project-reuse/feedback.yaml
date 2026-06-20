@@ -1,0 +1,13 @@
+{
+  "context_feedback": {
+    "useful_rules": [
+      "application artifacts must remain immutable",
+      "source skill status and confidence must not be rewritten"
+    ],
+    "missing_rules": [],
+    "ambiguous_rules": [],
+    "skill_candidates": [
+      "context-compliance-review"
+    ]
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "id": "source-eval",
+  "skill_id": "context-compliance-review",
+  "skill_version": "0.1.0",
+  "project": "decodex",
+  "session": "2026-06-20-v0.1.5-cross-project-reuse-source",
+  "status": "passed",
+  "runs": 1,
+  "successful_runs": 1,
+  "confidence": "low",
+  "recommendation": "continue_evaluation",
+  "evidence": [
+    "projects/decodex/sessions/2026-06-20-v0.1.5-cross-project-reuse-source/compliance-report.md"
+  ],
+  "contradictions": [],
+  "notes": [
+    "source project evidence"
+  ]
+}

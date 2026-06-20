@@ -1,0 +1,23 @@
+{
+  "id": "context-compliance-review--decodex--pac-hunt-2--2026-06-20-v0.1.5-cross-project-reuse--0.1.0",
+  "skill_id": "context-compliance-review",
+  "skill_title": "Context Compliance Review",
+  "skill_version": "0.1.0",
+  "source_project": "decodex",
+  "target_project": "pac-hunt-2",
+  "session": "2026-06-20-v0.1.5-cross-project-reuse",
+  "status": "applied",
+  "source_skill_path": "projects/decodex/skills/context-compliance-review/skill.yaml",
+  "source_hash": "6151e3ed7864ee24b0b9e572ec6eb3996e538c00077b178caffb7ef5264405dd",
+  "source_confidence": "low",
+  "source_recommendation": "continue_evaluation",
+  "source_status": "candidate",
+  "applied_at": "2026-06-20T21:36:41.357245+00:00",
+  "target_context_path": "projects/pac-hunt-2/.codex",
+  "report_path": "projects/pac-hunt-2/sessions/2026-06-20-v0.1.5-cross-project-reuse/skill-applications/context-compliance-review--decodex--pac-hunt-2--2026-06-20-v0.1.5-cross-project-reuse--0.1.0/report.md",
+  "latest_review_id": "2026-06-20-v0.1.4-evidence-based-skill-lifecycle-review",
+  "latest_review_path": "projects/decodex/skills/context-compliance-review/reviews/2026-06-20-v0.1.4-evidence-based-skill-lifecycle/review.yaml",
+  "latest_evaluation_id": "2026-06-20-v0.1.4-evidence-based-skill-lifecycle",
+  "latest_evaluation_path": "projects/decodex/skills/context-compliance-review/evaluations/2026-06-20-v0.1.4-evidence-based-skill-lifecycle/evaluation.yaml",
+  "source_origin": "decodex"
+}

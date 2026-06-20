@@ -1,0 +1,15 @@
+{
+  "id": "2026-06-20-v0.1.5-cross-project-reuse",
+  "project": "decodex",
+  "date": "2026-06-20",
+  "goal": "Record the first cross-project reuse proof for context-compliance-review.",
+  "artifacts": [
+    "projects/pac-hunt-2/sessions/2026-06-20-v0.1.5-cross-project-reuse/skill-applications/context-compliance-review--decodex--pac-hunt-2--2026-06-20-v0.1.5-cross-project-reuse--0.1.0/application.yaml",
+    "projects/pac-hunt-2/sessions/2026-06-20-v0.1.5-cross-project-reuse/skill-applications/context-compliance-review--decodex--pac-hunt-2--2026-06-20-v0.1.5-cross-project-reuse--0.1.0/report.md",
+    "projects/decodex/skills/context-compliance-review/evaluations/source-eval/evaluation.yaml",
+    "projects/pac-hunt-2/skills/context-compliance-review/evaluations/target-eval/evaluation.yaml",
+    "projects/pac-hunt-2/skills/context-compliance-review/reviews/cross-project-review/review.yaml",
+    "projects/pac-hunt-2/.codex/provenance.json",
+    ".codex/provenance.json"
+  ]
+}
