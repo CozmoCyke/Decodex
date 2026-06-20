@@ -11,9 +11,12 @@ if __package__ in {None, ""}:
 
 from decodex_core import (
     DecodexError,
+    audit_repository,
     build_context,
     capture_session,
     default_root,
+    init_project,
+    init_workspace,
     promote_skill,
     resolve_python_interpreter,
     search_repository,
@@ -56,7 +59,7 @@ def build_parser() -> argparse.ArgumentParser:
     context_parser = subparsers.add_parser("context")
     context_parser.add_argument("--root", default=default_root(), type=Path)
     context_parser.add_argument("--project", required=True)
-    context_parser.add_argument("--output-root", required=True, type=Path)
+    context_parser.add_argument("--output-root", type=Path)
     context_parser.set_defaults(command="context")
 
     audit_parser = subparsers.add_parser("audit")
@@ -67,6 +70,18 @@ def build_parser() -> argparse.ArgumentParser:
     runtime_parser.add_argument("--root", default=default_root(), type=Path)
     runtime_parser.set_defaults(command="runtime")
 
+    init_parser = subparsers.add_parser("init")
+    init_parser.add_argument("--root", default=default_root(), type=Path)
+    init_parser.add_argument("--force", action="store_true")
+    init_parser.set_defaults(command="init")
+
+    init_project_parser = subparsers.add_parser("init-project")
+    init_project_parser.add_argument("--root", default=default_root(), type=Path)
+    init_project_parser.add_argument("project")
+    init_project_parser.add_argument("--source", type=Path)
+    init_project_parser.add_argument("--force", action="store_true")
+    init_project_parser.set_defaults(command="init-project")
+
     return parser
 
 
@@ -75,13 +90,22 @@ def main(argv: list[str] | None = None) -> int:
     root: Path = args.root
 
     try:
-        if args.command in {"validate", "audit"}:
+        if args.command == "validate":
             errors = validate_repository(root)
             if errors:
                 for error in errors:
                     print(error, file=sys.stderr)
                 return 1
             print("Decodex validation passed")
+            return 0
+
+        if args.command == "audit":
+            errors = audit_repository(root)
+            if errors:
+                for error in errors:
+                    print(error, file=sys.stderr)
+                return 1
+            print("Decodex audit passed")
             return 0
 
         if args.command == "search":
@@ -116,12 +140,23 @@ def main(argv: list[str] | None = None) -> int:
             return 0
 
         if args.command == "context":
-            context_dir = build_context(root, project=args.project, output_root=args.output_root)
+            output_root = args.output_root or (root / "projects" / args.project)
+            context_dir = build_context(root, project=args.project, output_root=output_root)
             print(context_dir)
             return 0
 
         if args.command == "runtime":
             print(resolve_python_interpreter(root))
+            return 0
+
+        if args.command == "init":
+            init_workspace(root, force=args.force)
+            print(root)
+            return 0
+
+        if args.command == "init-project":
+            init_project(root, args.project, source=args.source, force=args.force)
+            print(root / "projects" / args.project)
             return 0
 
         raise DecodexError(f"unknown command: {args.command}")

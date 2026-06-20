@@ -1,6 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Decodex Manifest",
+  "x-decodex-version": "0.1.2",
   "type": "object",
   "required": [
     "name",
@@ -32,4 +33,3 @@
   },
   "additionalProperties": true
 }
-

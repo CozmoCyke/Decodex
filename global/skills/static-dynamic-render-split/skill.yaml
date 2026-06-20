@@ -4,6 +4,7 @@
   "version": "0.1.0",
   "status": "validated",
   "scope": "global",
+  "origin_project": "pac-hunt-2",
   "origin_projects": [
     "pac-hunt-2"
   ],
@@ -43,7 +44,9 @@
     "static content is still redrawn each frame",
     "performance tests are skipped"
   ],
+  "evidence": [
+    "projects/pac-hunt-2/reports/PACHUNT2_PERFORMANCE_FIX_REPORT.md"
+  ],
   "confidence": "high",
   "last_reviewed": "2026-06-20"
 }
-

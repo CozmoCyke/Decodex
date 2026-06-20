@@ -72,13 +72,17 @@ class GoldenPathTests(unittest.TestCase):
         output_root = self.root / "generated"
         context_dir = build_context(self.root, project="pac-hunt-2", output_root=output_root)
         self.assertTrue((context_dir / "AGENTS.md").exists())
-        self.assertTrue((context_dir / "project-skill.md").exists())
+        self.assertTrue((context_dir / "project-context.md").exists())
         self.assertTrue((context_dir / "safety-checklist.md").exists())
         self.assertTrue((context_dir / "testing-strategy.md").exists())
         self.assertTrue((context_dir / "inherited-skills.md").exists())
+        self.assertTrue((context_dir / "provenance.json").exists())
 
         inherited = (context_dir / "inherited-skills.md").read_text(encoding="utf-8")
-        self.assertIn("static-dynamic-render-split", inherited)
+        self.assertIn("origin_project=pac-hunt-2", inherited)
+        provenance = json.loads((context_dir / "provenance.json").read_text(encoding="utf-8"))
+        self.assertEqual(provenance["project"], "pac-hunt-2")
+        self.assertTrue(any(item["id"] == "static-dynamic-render-split" for item in provenance["inherited_skills"]))
 
 
 if __name__ == "__main__":

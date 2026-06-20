@@ -39,18 +39,26 @@ Decodex/
 
 ## Current Jalon
 
-`Decodex v0.1.1` focuses on the contract and the golden path:
+`Decodex v0.1.2` focuses on the operational foundation:
 
 - manifest, schema, and skill validation
-- temporary-workspace safety
-- a Pac-Hunt 2 capture and promotion flow
-- reproducible `.codex` context generation
+- repository-wide audit checks
+- safe workspace initialization
+- provenance-rich `.codex` generation
 
 ## CLI
 
 - `python tools/decodex.py validate`
+- `python tools/decodex.py audit`
 - `python tools/decodex.py search <query>`
 - `python tools/decodex.py capture --project <id> --id <session> --goal <text> --date YYYY-MM-DD`
 - `python tools/decodex.py promote <skill-id>`
 - `python tools/decodex.py context --project <id> --output-root <path>`
 - `python tools/decodex.py runtime`
+- `python tools/decodex.py init`
+- `python tools/decodex.py init-project <id> --source <path>`
+
+Launchers are also available:
+
+- `.\decodex.ps1`
+- `.\decodex.cmd`

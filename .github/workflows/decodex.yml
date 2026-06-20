@@ -1,0 +1,32 @@
+name: Decodex
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    strategy:
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Run tests
+        run: python -m unittest discover -s tests -v
+
+      - name: Validate repository
+        run: python tools/decodex.py validate --root ${{ github.workspace }}
+
+      - name: Audit repository
+        run: python tools/decodex.py audit --root ${{ github.workspace }}
+
+      - name: Context smoke test
+        run: python tools/decodex.py context --project pac-hunt-2 --root ${{ github.workspace }} --output-root ${{ github.workspace }}/generated

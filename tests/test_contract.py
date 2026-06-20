@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import shutil
 import tempfile
 import unittest
@@ -12,8 +13,11 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from decodex_core import (
+    audit_repository,
     DecodexError,
     capture_session,
+    init_project,
+    init_workspace,
     load_jsonish,
     resolve_python_interpreter,
     search_repository,
@@ -36,6 +40,7 @@ class ContractTests(unittest.TestCase):
 
     def test_repository_contract_validates(self) -> None:
         self.assertEqual(validate_repository(self.root), [])
+        self.assertEqual(audit_repository(self.root), [])
 
     def test_bootstrap_session_fixture_is_present(self) -> None:
         session = load_jsonish(
@@ -90,6 +95,38 @@ class ContractTests(unittest.TestCase):
         )
         self.assertTrue(session_dir.resolve().is_relative_to(self.root.resolve()))
         self.assertTrue((session_dir / "session.yaml").exists())
+
+    def test_init_workspace_creates_valid_skeleton(self) -> None:
+        target = Path(self._tmp.name) / "fresh-decodex"
+        created = init_workspace(target)
+        self.assertTrue((target / "decodex.yaml").exists())
+        self.assertTrue((target / "registry" / "skills-index.yaml").exists())
+        self.assertGreater(len(created), 0)
+        self.assertEqual(validate_repository(target), [])
+        self.assertEqual(audit_repository(target), [])
+
+    def test_audit_detects_broken_index(self) -> None:
+        broken_index = self.root / "registry" / "skills-index.yaml"
+        data = load_jsonish(broken_index)
+        data["skills"][0]["path"] = "global/skills/missing-skill/skill.yaml"
+        broken_index.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+        errors = audit_repository(self.root)
+        self.assertTrue(any("missing indexed skill file" in error for error in errors))
+
+    def test_audit_detects_absolute_windows_path(self) -> None:
+        rogue = self.root / "notes.md"
+        rogue.write_text("C" + ":" + "\\" + "temp" + "\\" + "oops" + "\\" + "file.txt", encoding="utf-8")
+        errors = audit_repository(self.root)
+        self.assertTrue(any("absolute Windows path" in error for error in errors))
+
+    def test_init_project_registers_project(self) -> None:
+        target = Path(self._tmp.name) / "fresh-decodex"
+        init_workspace(target)
+        created = init_project(target, "pac-hunt-2", source=self.root)
+        self.assertTrue((target / "projects" / "pac-hunt-2" / "project.yaml").exists())
+        self.assertTrue((target / "registry" / "projects-index.yaml").exists())
+        self.assertGreater(len(created), 0)
+        self.assertEqual(validate_repository(target), [])
 
 
 if __name__ == "__main__":

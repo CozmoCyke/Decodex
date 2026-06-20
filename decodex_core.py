@@ -1,11 +1,12 @@
-"""Core helpers for Decodex validation, search, capture, and promotion."""
+"""Core helpers for Decodex validation, audit, search, capture, promotion, and init."""
 
 from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
-from dataclasses import dataclass
+import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable
@@ -43,6 +44,17 @@ def load_jsonish(path: Path) -> Any:
 def dump_jsonish(path: Path, data: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(data, indent=2, ensure_ascii=True) + "\n", encoding="utf-8")
+
+
+def write_template_text(path: Path, content: str, *, force: bool = False) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if path.exists():
+        existing = path.read_text(encoding="utf-8")
+        if existing == content:
+            return
+        if not force:
+            raise DecodexError(f"refusing to overwrite existing file: {path}")
+    path.write_text(content, encoding="utf-8")
 
 
 def ensure_within_root(root: Path, target: Path) -> Path:
@@ -183,21 +195,26 @@ def validate_repository(root: Path) -> list[str]:
     errors: list[str] = []
 
     manifest_path = root / "decodex.yaml"
-    manifest = load_jsonish(manifest_path)
-    errors.extend(validate_schema(manifest, _load_schema(root, "decodex.schema.json")))
+    if manifest_path.exists():
+        try:
+            manifest = load_jsonish(manifest_path)
+            errors.extend(validate_schema(manifest, _load_schema(root, "decodex.schema.json")))
+        except DecodexError as exc:
+            errors.append(str(exc))
+    else:
+        errors.append(f"missing file: {manifest_path}")
 
-    for schema_name, relative_path in [
-        ("project.schema.json", Path("projects/decodex/project.yaml")),
-        ("project.schema.json", Path("projects/pac-hunt-2/project.yaml")),
-        ("skill.schema.json", Path("global/skills/safe-runtime-modification/skill.yaml")),
-        ("skill.schema.json", Path("projects/pac-hunt-2/skills/static-dynamic-render-split/skill.yaml")),
-    ]:
-        file_path = root / relative_path
-        if file_path.exists():
-            try:
-                errors.extend(validate_json_schema_file(file_path, root / "schemas" / schema_name))
-            except DecodexError as exc:
-                errors.append(str(exc))
+    for project_path in _discover_project_files(root):
+        try:
+            errors.extend(validate_json_schema_file(project_path, root / "schemas" / "project.schema.json"))
+        except DecodexError as exc:
+            errors.append(str(exc))
+
+    for session_path in _discover_session_files(root):
+        try:
+            errors.extend(validate_json_schema_file(session_path, root / "schemas" / "session.schema.json"))
+        except DecodexError as exc:
+            errors.append(str(exc))
 
     for index_path, key in [
         (root / "registry" / "skills-index.yaml", "skills"),
@@ -220,6 +237,20 @@ def validate_repository(root: Path) -> list[str]:
     return errors
 
 
+def audit_repository(root: Path) -> list[str]:
+    errors = validate_repository(root)
+    errors.extend(_audit_schema_compatibility(root))
+    errors.extend(_audit_indexes(root))
+    errors.extend(_audit_duplicate_skill_ids(root))
+    errors.extend(_audit_project_structure(root))
+    errors.extend(_audit_sessions(root))
+    errors.extend(_audit_promotions(root))
+    errors.extend(_audit_absolute_paths(root))
+    errors.extend(_audit_tracked_generated_files(root))
+    errors.extend(_audit_evidence_references(root))
+    return sorted(dict.fromkeys(errors))
+
+
 def _discover_skill_files(root: Path) -> list[Path]:
     files: list[Path] = []
     for base in [root / "global" / "skills", root / "projects"]:
@@ -227,6 +258,26 @@ def _discover_skill_files(root: Path) -> list[Path]:
             continue
         for path in base.rglob("skill.yaml"):
             files.append(path)
+    return sorted({path.resolve() for path in files})
+
+
+def _discover_project_files(root: Path) -> list[Path]:
+    files: list[Path] = []
+    projects_dir = root / "projects"
+    if not projects_dir.exists():
+        return []
+    for path in projects_dir.rglob("project.yaml"):
+        files.append(path)
+    return sorted({path.resolve() for path in files})
+
+
+def _discover_session_files(root: Path) -> list[Path]:
+    files: list[Path] = []
+    projects_dir = root / "projects"
+    if not projects_dir.exists():
+        return []
+    for path in projects_dir.rglob("session.yaml"):
+        files.append(path)
     return sorted({path.resolve() for path in files})
 
 
@@ -344,22 +395,542 @@ def build_context(root: Path, *, project: str, output_root: Path) -> Path:
     context_dir = ensure_within_root(root, workspace_output / ".codex")
     context_dir.mkdir(parents=True, exist_ok=True)
 
-    project_skill_ids = _list_skill_ids(root / "projects" / project / "skills")
-    global_skill_ids = _list_skill_ids(root / "global" / "skills")
+    project_skills = _list_skill_records(root, root / "projects" / project / "skills")
+    inherited_skills = _list_skill_records(root, root / "global" / "skills")
 
     files = {
         "AGENTS.md": "# Agent Context\n\nGenerated by Decodex.\n",
-        "project-skill.md": _render_skill_list("Project Skills", project_skill_ids),
+        "project-context.md": _render_project_context(project, project_skills),
         "safety-checklist.md": "# Safety Checklist\n\n- Snapshot\n- Validation\n- Rollback\n",
         "testing-strategy.md": "# Testing Strategy\n\n- Syntax\n- Functional\n- Regression\n",
-        "inherited-skills.md": _render_skill_list("Inherited Skills", global_skill_ids),
+        "inherited-skills.md": _render_inherited_skills(inherited_skills),
+        "provenance.json": json.dumps(
+            {
+                "project": project,
+                "generated_at": datetime.now(timezone.utc).isoformat(),
+                "project_skills": project_skills,
+                "inherited_skills": inherited_skills,
+            },
+            indent=2,
+            ensure_ascii=True,
+        )
+        + "\n",
     }
     for filename, content in files.items():
-        (context_dir / filename).write_text(content, encoding="utf-8")
+        write_template_text(context_dir / filename, content, force=True)
     return context_dir
 
 
-def _render_skill_list(title: str, skills: Iterable[str]) -> str:
+def _render_project_context(project: str, skills: list[dict[str, Any]]) -> str:
+    lines = [f"# Project Context", "", f"- Project: {project}", ""]
+    if not skills:
+        lines.append("- No project skills recorded yet.")
+    else:
+        lines.append("## Project Skills")
+        for skill in skills:
+            lines.append(f"- {skill['id']} - {skill.get('title', skill['id'])}")
+    lines.append("")
+    return "\n".join(lines)
+
+
+def _render_inherited_skills(skills: list[dict[str, Any]]) -> str:
+    lines = ["# Inherited Skills", ""]
+    if not skills:
+        lines.append("- None")
+    else:
+        for skill in skills:
+            evidence = ", ".join(skill.get("evidence", [])) or "none"
+            lines.append(
+                f"- {skill['id']} | scope={skill.get('scope', 'global')} | "
+                f"origin_project={skill.get('origin_project', 'unknown')} | "
+                f"confidence={skill.get('confidence', 'unknown')} | evidence={evidence}"
+            )
+    lines.append("")
+    return "\n".join(lines)
+
+
+def _list_skill_records(root: Path, base: Path) -> list[dict[str, Any]]:
+    if not base.exists():
+        return []
+    records: list[dict[str, Any]] = []
+    for skill_file in sorted(base.rglob("skill.yaml")):
+        try:
+            skill = load_jsonish(skill_file)
+        except DecodexError:
+            continue
+        skill_id = skill.get("id")
+        if isinstance(skill_id, str):
+            record = {
+                "id": skill_id,
+                "title": skill.get("title", skill_id),
+                "scope": skill.get("scope", "unknown"),
+                "origin_project": skill.get("origin_project") or _infer_origin_project(skill_file),
+                "confidence": skill.get("confidence", "unknown"),
+                "evidence": skill.get("evidence", []),
+                "source_path": skill_file.relative_to(root).as_posix(),
+            }
+            records.append(record)
+    return records
+
+
+def _infer_origin_project(skill_file: Path) -> str:
+    parts = skill_file.parts
+    if "projects" in parts:
+        index = parts.index("projects")
+        if index + 1 < len(parts):
+            return parts[index + 1]
+    return "unknown"
+
+
+def _audit_schema_compatibility(root: Path) -> list[str]:
+    errors: list[str] = []
+    manifest_path = root / "decodex.yaml"
+    schema_path = root / "schemas" / "decodex.schema.json"
+    if not manifest_path.exists() or not schema_path.exists():
+        return errors
+    try:
+        manifest = load_jsonish(manifest_path)
+        schema = json.loads(schema_path.read_text(encoding="utf-8"))
+    except DecodexError as exc:
+        return [str(exc)]
+    except json.JSONDecodeError as exc:
+        return [f"{schema_path}: invalid JSON: {exc.msg}"]
+
+    expected = schema.get("x-decodex-version")
+    actual = manifest.get("version")
+    if expected and actual != expected:
+        errors.append(f"{manifest_path}: version {actual!r} is incompatible with schema {expected!r}")
+    return errors
+
+
+def _audit_indexes(root: Path) -> list[str]:
+    errors: list[str] = []
+    skill_index_path = root / "registry" / "skills-index.yaml"
+    project_index_path = root / "registry" / "projects-index.yaml"
+
+    if skill_index_path.exists():
+        try:
+            data = load_jsonish(skill_index_path)
+        except DecodexError as exc:
+            return [str(exc)]
+        skills = data.get("skills", [])
+        seen_ids: set[str] = set()
+        for entry in skills if isinstance(skills, list) else []:
+            if not isinstance(entry, dict):
+                errors.append(f"{skill_index_path}: skill entries must be objects")
+                continue
+            skill_id = entry.get("id")
+            path_value = entry.get("path")
+            if not isinstance(skill_id, str) or not skill_id:
+                errors.append(f"{skill_index_path}: skill entry missing id")
+            if not isinstance(path_value, str) or not path_value:
+                errors.append(f"{skill_index_path}: skill entry {skill_id!r} missing path")
+            elif not (root / path_value).exists():
+                errors.append(f"{skill_index_path}: missing indexed skill file {path_value}")
+            if isinstance(skill_id, str):
+                if skill_id in seen_ids:
+                    errors.append(f"{skill_index_path}: duplicate skill id {skill_id}")
+                seen_ids.add(skill_id)
+    if project_index_path.exists():
+        try:
+            data = load_jsonish(project_index_path)
+        except DecodexError as exc:
+            return errors + [str(exc)]
+        projects = data.get("projects", [])
+        seen_ids: set[str] = set()
+        for entry in projects if isinstance(projects, list) else []:
+            if not isinstance(entry, dict):
+                errors.append(f"{project_index_path}: project entries must be objects")
+                continue
+            project_id = entry.get("id")
+            path_value = entry.get("path")
+            if not isinstance(project_id, str) or not project_id:
+                errors.append(f"{project_index_path}: project entry missing id")
+            if not isinstance(path_value, str) or not path_value:
+                errors.append(f"{project_index_path}: project entry {project_id!r} missing path")
+            elif not (root / path_value).exists():
+                errors.append(f"{project_index_path}: missing indexed project file {path_value}")
+            if isinstance(project_id, str):
+                if project_id in seen_ids:
+                    errors.append(f"{project_index_path}: duplicate project id {project_id}")
+                seen_ids.add(project_id)
+    return errors
+
+
+def _audit_duplicate_skill_ids(root: Path) -> list[str]:
+    errors: list[str] = []
+    seen: dict[str, list[Path]] = {}
+    for skill_file in _discover_skill_files(root):
+        try:
+            skill = load_jsonish(skill_file)
+        except DecodexError as exc:
+            errors.append(str(exc))
+            continue
+        skill_id = skill.get("id")
+        if isinstance(skill_id, str):
+            seen.setdefault(skill_id, []).append(skill_file)
+
+    for skill_id, files in seen.items():
+        if len(files) <= 1:
+            continue
+        scopes = {_skill_scope_for_path(root, file) for file in files}
+        if scopes == {"project", "global"} and len(files) == 2 and _has_matching_promotion_event(root, skill_id, files):
+            continue
+        errors.append(f"duplicate skill id {skill_id}: " + ", ".join(str(path) for path in files))
+    return errors
+
+
+def _skill_scope_for_path(root: Path, path: Path) -> str:
+    relative = path.relative_to(root).parts
+    if relative[:2] == ("global", "skills"):
+        return "global"
+    if relative[:1] == ("projects",):
+        return "project"
+    return "unknown"
+
+
+def _has_matching_promotion_event(root: Path, skill_id: str, files: list[Path]) -> bool:
+    history = root / "registry" / "promotion-history.jsonl"
+    if not history.exists():
+        return False
+    project_file = next((path for path in files if _skill_scope_for_path(root, path) == "project"), None)
+    global_file = next((path for path in files if _skill_scope_for_path(root, path) == "global"), None)
+    if project_file is None or global_file is None:
+        return False
+    source_path = project_file.relative_to(root).parent.as_posix()
+    target_path = global_file.relative_to(root).parent.as_posix()
+    for line in history.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        try:
+            event = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if event.get("skill_id") != skill_id:
+            continue
+        if event.get("source_path") == source_path and event.get("target_path") == target_path:
+            return True
+    return False
+
+
+def _audit_project_structure(root: Path) -> list[str]:
+    errors: list[str] = []
+    projects_dir = root / "projects"
+    if not projects_dir.exists():
+        return errors
+    for project_dir in [p for p in projects_dir.iterdir() if p.is_dir()]:
+        project_file = project_dir / "project.yaml"
+        if not project_file.exists():
+            errors.append(f"missing project.yaml: {project_file}")
+    return errors
+
+
+def _audit_sessions(root: Path) -> list[str]:
+    errors: list[str] = []
+    projects = _project_ids(root)
+    for session_file in _discover_session_files(root):
+        try:
+            session = load_jsonish(session_file)
+        except DecodexError as exc:
+            errors.append(str(exc))
+            continue
+        project = session.get("project")
+        if not isinstance(project, str) or project not in projects:
+            errors.append(f"{session_file}: invalid project reference {project!r}")
+        parent_project = session_file.parent.parent.parent.name
+        if isinstance(project, str) and project != parent_project:
+            errors.append(f"{session_file}: session project {project!r} does not match parent project {parent_project!r}")
+    return errors
+
+
+def _audit_promotions(root: Path) -> list[str]:
+    errors: list[str] = []
+    history = root / "registry" / "promotion-history.jsonl"
+    if not history.exists():
+        return errors
+    for line_no, line in enumerate(history.read_text(encoding="utf-8").splitlines(), start=1):
+        if not line.strip():
+            continue
+        try:
+            event = json.loads(line)
+        except json.JSONDecodeError as exc:
+            errors.append(f"{history}:{line_no}: invalid JSON: {exc.msg}")
+            continue
+        source_path = event.get("source_path")
+        target_path = event.get("target_path")
+        if not isinstance(source_path, str) or not source_path:
+            errors.append(f"{history}:{line_no}: missing provenance source_path")
+        elif not (root / source_path).exists():
+            errors.append(f"{history}:{line_no}: missing provenance source file {source_path}")
+        if not isinstance(target_path, str) or not target_path:
+            errors.append(f"{history}:{line_no}: missing provenance target_path")
+    return errors
+
+
+_WINDOWS_ABSOLUTE_PATH = re.compile(r"[A-Za-z]:\\")
+
+
+def _audit_absolute_paths(root: Path) -> list[str]:
+    errors: list[str] = []
+    for path in root.rglob("*"):
+        if not path.is_file():
+            continue
+        if path.suffix.lower() not in {".md", ".yaml", ".yml", ".json", ".jsonl", ".txt", ".ps1", ".cmd"}:
+            continue
+        if path.suffix.lower() == ".py":
+            continue
+        try:
+            text = path.read_text(encoding="utf-8")
+        except UnicodeDecodeError:
+            continue
+        if _WINDOWS_ABSOLUTE_PATH.search(text):
+            errors.append(f"{path}: contains an absolute Windows path")
+    return errors
+
+
+def _audit_tracked_generated_files(root: Path) -> list[str]:
+    patterns = ["__pycache__", ".pytest_cache", ".coverage", "htmlcov", ".venv", "venv", ".env", "*.tmp", "*.log"]
+    errors: list[str] = []
+    try:
+        result = subprocess.run(
+            ["git", "-c", f"safe.directory={root.as_posix()}", "ls-files"],
+            cwd=root,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except OSError:
+        return errors
+    if result.returncode != 0:
+        return errors
+    tracked = [line.strip() for line in result.stdout.splitlines() if line.strip()]
+    for path in tracked:
+        for pattern in patterns:
+            if pattern in {"__pycache__", ".pytest_cache", ".coverage", "htmlcov", ".venv", "venv", ".env"}:
+                if pattern in path:
+                    errors.append(f"tracked generated file: {path}")
+                    break
+            elif pattern == "*.tmp" and path.endswith(".tmp"):
+                errors.append(f"tracked generated file: {path}")
+                break
+            elif pattern == "*.log" and path.endswith(".log"):
+                errors.append(f"tracked generated file: {path}")
+                break
+    return errors
+
+
+def _audit_evidence_references(root: Path) -> list[str]:
+    errors: list[str] = []
+    for skill_file in _discover_skill_files(root):
+        try:
+            skill = load_jsonish(skill_file)
+        except DecodexError as exc:
+            errors.append(str(exc))
+            continue
+        evidence = skill.get("evidence", [])
+        if isinstance(evidence, list):
+            for entry in evidence:
+                if isinstance(entry, str) and entry and not (root / entry).exists():
+                    errors.append(f"{skill_file}: missing evidence file {entry}")
+    return errors
+
+
+def _project_ids(root: Path) -> set[str]:
+    ids: set[str] = set()
+    for project_file in _discover_project_files(root):
+        try:
+            project = load_jsonish(project_file)
+        except DecodexError:
+            continue
+        project_id = project.get("id")
+        if isinstance(project_id, str):
+            ids.add(project_id)
+    return ids
+
+
+def init_workspace(root: Path, *, force: bool = False) -> list[Path]:
+    created: list[Path] = []
+    root.mkdir(parents=True, exist_ok=True)
+
+    text_templates = {
+        "README.md": "# Decodex\n\nLocal memory system for development work.\n",
+        ".gitignore": "__pycache__/\n*.py[cod]\n.pytest_cache/\n.coverage\nhtmlcov/\n.venv/\nvenv/\n.env\n*.tmp\n*.log\n",
+        "inbox/README.md": "# Inbox\n\nRaw capture area for sessions and evidence.\n",
+        "global/README.md": "# Global\n\nReusable skills, patterns, and checklists.\n",
+        "projects/README.md": "# Projects\n\nProject-specific memory lives here.\n",
+        "tools/README.md": "# Tools\n\nUtility scripts for capture, search, promotion, init, and context generation.\n",
+    }
+    json_templates = {
+        "decodex.yaml": {
+            "name": "Decodex",
+            "version": "0.1.2",
+            "status": "mvp",
+            "runtime": {"python_candidates": ["python", "python3"]},
+            "layers": {
+                "inbox": {"purpose": "raw session evidence"},
+                "projects": {"purpose": "validated project-specific knowledge"},
+                "global": {"purpose": "cross-project reusable knowledge"},
+            },
+            "registry": {
+                "skills_index": "registry/skills-index.yaml",
+                "projects_index": "registry/projects-index.yaml",
+                "promotion_history": "registry/promotion-history.jsonl",
+            },
+            "conventions": {
+                "knowledge_states": [
+                    "RAW",
+                    "OBSERVED",
+                    "CANDIDATE",
+                    "PROJECT_VALIDATED",
+                    "GLOBAL_VALIDATED",
+                    "DEPRECATED",
+                ]
+            },
+        },
+        "registry/skills-index.yaml": {"skills": []},
+        "registry/projects-index.yaml": {"projects": []},
+        "schemas/decodex.schema.json": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "title": "Decodex Manifest",
+            "x-decodex-version": "0.1.2",
+            "type": "object",
+            "required": ["name", "version", "status", "runtime", "layers", "registry", "conventions"],
+            "properties": {
+                "name": {"type": "string"},
+                "version": {"type": "string"},
+                "status": {"type": "string"},
+                "runtime": {"type": "object"},
+                "layers": {"type": "object"},
+                "registry": {"type": "object"},
+                "conventions": {"type": "object"},
+            },
+            "additionalProperties": True,
+        },
+        "schemas/project.schema.json": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "title": "Decodex Project",
+            "x-decodex-version": "0.1.2",
+            "type": "object",
+            "required": ["id", "name", "status", "domains"],
+            "properties": {
+                "id": {"type": "string"},
+                "name": {"type": "string"},
+                "status": {"type": "string"},
+                "domains": {"type": "array", "items": {"type": "string"}},
+            },
+            "additionalProperties": True,
+        },
+        "schemas/session.schema.json": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "title": "Decodex Session",
+            "x-decodex-version": "0.1.2",
+            "type": "object",
+            "required": ["id", "project", "date", "goal"],
+            "properties": {
+                "id": {"type": "string"},
+                "project": {"type": "string"},
+                "date": {"type": "string"},
+                "goal": {"type": "string"},
+            },
+            "additionalProperties": True,
+        },
+        "schemas/skill.schema.json": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "title": "Decodex Skill",
+            "x-decodex-version": "0.1.2",
+            "type": "object",
+            "required": ["id", "title", "version", "status", "scope"],
+            "properties": {
+                "id": {"type": "string"},
+                "title": {"type": "string"},
+                "version": {"type": "string"},
+                "status": {"type": "string"},
+                "scope": {"type": "string"},
+                "tags": {"type": "array", "items": {"type": "string"}},
+                "evidence": {"type": "array", "items": {"type": "string"}},
+            },
+            "additionalProperties": True,
+        },
+        "schemas/decision.schema.json": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "title": "Decodex Decision",
+            "x-decodex-version": "0.1.2",
+            "type": "object",
+            "required": ["id", "project", "summary", "status"],
+            "properties": {
+                "id": {"type": "string"},
+                "project": {"type": "string"},
+                "summary": {"type": "string"},
+                "status": {"type": "string"},
+            },
+            "additionalProperties": True,
+        },
+    }
+    text_templates["registry/promotion-history.jsonl"] = ""
+    for rel, text in text_templates.items():
+        path = root / rel
+        write_template_text(path, text, force=force)
+        created.append(path)
+    for rel, data in json_templates.items():
+        path = root / rel
+        dump_jsonish(path, data)
+        created.append(path)
+
+    validate_errors = validate_repository(root)
+    if validate_errors:
+        raise DecodexError("initialization produced an invalid repository:\n" + "\n".join(validate_errors))
+    return created
+
+
+def init_project(root: Path, project: str, *, source: Path | None = None, force: bool = False) -> list[Path]:
+    created: list[Path] = []
+    project_root = root / "projects" / project
+    project_root.mkdir(parents=True, exist_ok=True)
+    project_data = {
+        "id": project,
+        "name": project.replace("-", " ").title(),
+        "status": "active",
+        "domains": ["workflow"],
+    }
+    if source is not None:
+        project_data["source_root"] = str(source)
+
+    write_template_text(project_root / "README.md", f"# {project}\n\nProject memory for {project}.\n", force=force)
+    dump_jsonish(project_root / "project.yaml", project_data)
+    created.append(project_root / "project.yaml")
+
+    for rel in [
+        "sessions/README.md",
+        "skills/README.md",
+        "decisions/README.md",
+        "incidents/README.md",
+        "checkpoints/README.md",
+        "reports/README.md",
+    ]:
+        path = project_root / rel
+        write_template_text(path, f"# {path.parent.name.title()}\n\n", force=force)
+        created.append(path)
+
+    projects_index_path = root / "registry" / "projects-index.yaml"
+    if projects_index_path.exists():
+        index = load_jsonish(projects_index_path)
+    else:
+        index = {"projects": []}
+    projects = index.setdefault("projects", [])
+    if not isinstance(projects, list):
+        raise DecodexError(f"{projects_index_path}: projects index must contain a list")
+    existing = next((entry for entry in projects if isinstance(entry, dict) and entry.get("id") == project), None)
+    if existing is None:
+        projects.append({"id": project, "status": "active", "path": f"projects/{project}"})
+        dump_jsonish(projects_index_path, index)
+        created.append(projects_index_path)
+    elif force:
+        dump_jsonish(projects_index_path, index)
+
+    validate_errors = validate_repository(root)
+    if validate_errors:
+        raise DecodexError("project initialization produced an invalid repository:\n" + "\n".join(validate_errors))
+    return created
     lines = [f"# {title}", ""]
     for skill in skills:
         lines.append(f"- {skill}")

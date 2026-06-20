@@ -4,24 +4,28 @@
       "id": "safe-runtime-modification",
       "scope": "global",
       "status": "validated",
+      "path": "global/skills/safe-runtime-modification/skill.yaml",
       "tags": [
         "runtime",
         "backup",
         "rollback",
         "validation",
         "safety"
-      ]
+      ],
+      "origin_project": "open-elearning"
     },
     {
       "id": "static-dynamic-render-split",
       "scope": "global",
       "status": "validated",
+      "path": "global/skills/static-dynamic-render-split/skill.yaml",
       "tags": [
         "performance",
         "rendering",
         "playwright",
         "gameplay"
-      ]
+      ],
+      "origin_project": "pac-hunt-2"
     }
   ]
 }
