@@ -1,0 +1,51 @@
+{
+  "id": "decodex-2026-06-20-v0.1.2-operational-foundation",
+  "project": "decodex",
+  "date": "2026-06-20",
+  "goal": "Record the operational foundation milestone for Decodex v0.1.2.",
+  "inputs": [
+    "audit command",
+    "init command",
+    "init-project command",
+    "provenance-rich .codex generation",
+    "Windows launchers",
+    "GitHub Actions CI",
+    "Pac-Hunt 2 performance report"
+  ],
+  "changes": [
+    "added audit, init, and init-project to the CLI",
+    "generated .codex with provenance",
+    "added decodex.cmd and decodex.ps1",
+    "added GitHub Actions workflow",
+    "added Pac-Hunt 2 evidence report"
+  ],
+  "validation": {
+    "commands": [
+      "python -m unittest discover -s tests -v",
+      "python tools\\decodex.py validate --root .",
+      "python tools\\decodex.py audit --root ."
+    ],
+    "results": [
+      "unit tests passed",
+      "validate passed",
+      "audit passed"
+    ]
+  },
+  "lessons": {
+    "project": [
+      "Decodex can now verify and initialize its own memory."
+    ],
+    "global_candidates": [
+      "record the operational milestone before tagging a release",
+      "treat provenance as part of the context, not as optional metadata"
+    ]
+  },
+  "artifacts": [
+    "README.md",
+    "decodex.yaml",
+    ".github/workflows/decodex.yml",
+    "decodex.cmd",
+    "decodex.ps1",
+    "projects/pac-hunt-2/reports/PACHUNT2_PERFORMANCE_FIX_REPORT.md"
+  ]
+}
