@@ -1,0 +1,29 @@
+{
+  "id": "decodex-self-application-policy",
+  "project": "decodex",
+  "summary": "Decodex must use its own capture, validation, audit, promotion, context, and provenance mechanisms throughout its development.",
+  "status": "validated",
+  "date": "2026-06-20",
+  "rationale": [
+    "Decodex should prove its usefulness on a real evolving project from the beginning.",
+    "Using Decodex on itself exposes missing contracts, unsafe workflows, and weak documentation early.",
+    "The project's own history should become the first complete tutorial and evidence trail for Decodex 1.0."
+  ],
+  "policy": {
+    "applies_from": "0.1.1",
+    "requirements": [
+      "record each significant Decodex development milestone as a Decodex session",
+      "record architectural and workflow choices as Decodex decisions",
+      "extract project lessons and reusable skill candidates from Decodex development",
+      "validate and audit Decodex with its own CLI whenever the relevant commands exist",
+      "generate and review a Decodex .codex context with Decodex itself",
+      "preserve provenance from changes and tests to sessions, decisions, and promoted skills"
+    ],
+    "exception_rule": "A Decodex feature that cannot yet be used on Decodex itself must document the limitation and the milestone that will remove it."
+  },
+  "success_criteria": [
+    "Decodex is registered as an active Decodex project",
+    "major Decodex changes have traceable sessions and decisions",
+    "the future user tutorial can be generated from Decodex's own development history"
+  ]
+}
