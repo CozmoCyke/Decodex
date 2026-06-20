@@ -7,7 +7,7 @@ Use this compiled context as a working contract, not as source of truth.
 ## Operating Rules
 - Refuse writes outside the workspace root.
 - Run validate before audit.
-- Never promote global skills automatically in v0.1.3.
+- Never promote global skills automatically without review evidence in v0.1.4.
 
 ## Required Validation
 - python -m unittest discover -s tests -v

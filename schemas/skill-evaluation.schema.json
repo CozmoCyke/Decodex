@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Decodex Skill Evaluation",
+  "x-decodex-version": "0.1.4",
+  "type": "object",
+  "required": [
+    "id",
+    "skill_id",
+    "skill_version",
+    "project",
+    "session",
+    "status",
+    "runs",
+    "successful_runs",
+    "recommendation",
+    "evidence"
+  ],
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "skill_id": {
+      "type": "string"
+    },
+    "skill_version": {
+      "type": "string"
+    },
+    "project": {
+      "type": "string"
+    },
+    "session": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string"
+    },
+    "runs": {
+      "type": "integer"
+    },
+    "successful_runs": {
+      "type": "integer"
+    },
+    "confidence": {
+      "type": "string"
+    },
+    "recommendation": {
+      "type": "string"
+    },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "contradictions": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "notes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "additionalProperties": true
+}

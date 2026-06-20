@@ -1,0 +1,20 @@
+{
+  "id": "2026-06-20-v0.1.4-evidence-based-skill-lifecycle-review",
+  "skill_id": "context-compliance-review",
+  "skill_version": "0.1.0",
+  "project": "decodex",
+  "reviewer": "decodex",
+  "evaluation_ids": [
+    "2026-06-20-v0.1.4-evidence-based-skill-lifecycle"
+  ],
+  "recommendation": "continue_evaluation",
+  "confidence": "low",
+  "evidence": [
+    "projects/decodex/sessions/2026-06-20-v0.1.4-evidence-based-skill-lifecycle/compliance-report.md",
+    "projects/decodex/sessions/2026-06-20-v0.1.4-evidence-based-skill-lifecycle/feedback.yaml"
+  ],
+  "notes": [
+    "v0.1.4 formalizes evidence-based skill lifecycle",
+    "one evaluation keeps context-compliance-review in candidate mode with low confidence"
+  ]
+}

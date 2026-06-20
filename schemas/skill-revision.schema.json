@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Decodex Skill Revision",
+  "x-decodex-version": "0.1.4",
+  "type": "object",
+  "required": [
+    "id",
+    "skill_id",
+    "project",
+    "from_version",
+    "to_version",
+    "status"
+  ],
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "skill_id": {
+      "type": "string"
+    },
+    "project": {
+      "type": "string"
+    },
+    "from_version": {
+      "type": "string"
+    },
+    "to_version": {
+      "type": "string"
+    },
+    "summary": {
+      "type": "string"
+    },
+    "rationale": {
+      "type": "string"
+    },
+    "evaluation_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "status": {
+      "type": "string"
+    }
+  },
+  "additionalProperties": true
+}

@@ -19,6 +19,10 @@ from decodex_core import (
     init_workspace,
     promote_skill,
     context_check,
+    skill_diff,
+    skill_evaluate,
+    skill_revise,
+    skill_review,
     session_close,
     resolve_python_interpreter,
     search_repository,
@@ -103,6 +107,55 @@ def build_parser() -> argparse.ArgumentParser:
     session_close_parser.add_argument("--ambiguous-rule", action="append", default=[])
     session_close_parser.add_argument("--skill-candidate", action="append", default=[])
     session_close_parser.set_defaults(command="session-close")
+
+    skill_eval_parser = subparsers.add_parser("skill-eval")
+    skill_eval_parser.add_argument("--root", default=default_root(), type=Path)
+    skill_eval_parser.add_argument("--project", required=True)
+    skill_eval_parser.add_argument("--skill-id", required=True)
+    skill_eval_parser.add_argument("--evaluation-id", required=True)
+    skill_eval_parser.add_argument("--scope", default="project", choices=["project", "global"])
+    skill_eval_parser.add_argument("--recommendation", default="project_validated")
+    skill_eval_parser.add_argument("--confidence", default="medium")
+    skill_eval_parser.add_argument("--runs", type=int, default=1)
+    skill_eval_parser.add_argument("--successful-runs", type=int)
+    skill_eval_parser.add_argument("--evidence", action="append", default=[])
+    skill_eval_parser.add_argument("--note", action="append", default=[])
+    skill_eval_parser.set_defaults(command="skill-eval")
+
+    skill_review_parser = subparsers.add_parser("skill-review")
+    skill_review_parser.add_argument("--root", default=default_root(), type=Path)
+    skill_review_parser.add_argument("--project", required=True)
+    skill_review_parser.add_argument("--skill-id", required=True)
+    skill_review_parser.add_argument("--review-id", required=True)
+    skill_review_parser.add_argument("--scope", default="project", choices=["project", "global"])
+    skill_review_parser.add_argument("--evaluation-id", action="append", default=[])
+    skill_review_parser.add_argument("--recommendation", default="project_validated")
+    skill_review_parser.add_argument("--approved-by")
+    skill_review_parser.add_argument("--confidence", default="medium")
+    skill_review_parser.add_argument("--note", action="append", default=[])
+    skill_review_parser.set_defaults(command="skill-review")
+
+    skill_revise_parser = subparsers.add_parser("skill-revise")
+    skill_revise_parser.add_argument("--root", default=default_root(), type=Path)
+    skill_revise_parser.add_argument("--project", required=True)
+    skill_revise_parser.add_argument("--skill-id", required=True)
+    skill_revise_parser.add_argument("--revision-id", required=True)
+    skill_revise_parser.add_argument("--to-version", required=True)
+    skill_revise_parser.add_argument("--scope", default="project", choices=["project", "global"])
+    skill_revise_parser.add_argument("--status")
+    skill_revise_parser.add_argument("--summary", default="")
+    skill_revise_parser.add_argument("--rationale", default="")
+    skill_revise_parser.add_argument("--evaluation-id", action="append", default=[])
+    skill_revise_parser.set_defaults(command="skill-revise")
+
+    skill_diff_parser = subparsers.add_parser("skill-diff")
+    skill_diff_parser.add_argument("--root", default=default_root(), type=Path)
+    skill_diff_parser.add_argument("--project", required=True)
+    skill_diff_parser.add_argument("--skill-id", required=True)
+    skill_diff_parser.add_argument("--left-version", required=True)
+    skill_diff_parser.add_argument("--right-version", required=True)
+    skill_diff_parser.add_argument("--scope", default="project", choices=["project", "global"])
+    skill_diff_parser.set_defaults(command="skill-diff")
 
     return parser
 
@@ -205,6 +258,69 @@ def main(argv: list[str] | None = None) -> int:
                 skill_candidates=list(args.skill_candidate),
             )
             print(report)
+            return 0
+
+        if args.command == "skill-eval":
+            path = skill_evaluate(
+                root,
+                skill_id=args.skill_id,
+                project=args.project,
+                evaluation_id=args.evaluation_id,
+                scope=args.scope,
+                recommendation=args.recommendation,
+                confidence=args.confidence,
+                evidence=list(args.evidence),
+                notes=list(args.note),
+                runs=args.runs,
+                successful_runs=args.successful_runs,
+            )
+            print(path)
+            return 0
+
+        if args.command == "skill-review":
+            path = skill_review(
+                root,
+                skill_id=args.skill_id,
+                project=args.project,
+                review_id=args.review_id,
+                scope=args.scope,
+                evaluation_ids=list(args.evaluation_id),
+                recommendation=args.recommendation,
+                approved_by=args.approved_by,
+                confidence=args.confidence,
+                notes=list(args.note),
+            )
+            print(path)
+            return 0
+
+        if args.command == "skill-revise":
+            skill_file, revision_file = skill_revise(
+                root,
+                skill_id=args.skill_id,
+                project=args.project,
+                revision_id=args.revision_id,
+                to_version=args.to_version,
+                scope=args.scope,
+                status=args.status,
+                summary=args.summary,
+                rationale=args.rationale,
+                evaluation_ids=list(args.evaluation_id),
+            )
+            print(skill_file)
+            print(revision_file)
+            return 0
+
+        if args.command == "skill-diff":
+            print(
+                skill_diff(
+                    root,
+                    skill_id=args.skill_id,
+                    project=args.project,
+                    left_version=args.left_version,
+                    right_version=args.right_version,
+                    scope=args.scope,
+                )
+            )
             return 0
 
         raise DecodexError(f"unknown command: {args.command}")

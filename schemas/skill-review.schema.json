@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Decodex Skill Review",
+  "x-decodex-version": "0.1.4",
+  "type": "object",
+  "required": [
+    "id",
+    "skill_id",
+    "skill_version",
+    "project",
+    "reviewer",
+    "evaluation_ids",
+    "recommendation"
+  ],
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "skill_id": {
+      "type": "string"
+    },
+    "skill_version": {
+      "type": "string"
+    },
+    "project": {
+      "type": "string"
+    },
+    "reviewer": {
+      "type": "string"
+    },
+    "evaluation_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "recommendation": {
+      "type": "string"
+    },
+    "approved_by": {
+      "type": "string"
+    },
+    "confidence": {
+      "type": "string"
+    },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "notes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "additionalProperties": true
+}

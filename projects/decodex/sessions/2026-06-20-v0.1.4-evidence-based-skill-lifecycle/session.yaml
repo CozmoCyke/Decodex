@@ -1,0 +1,37 @@
+{
+  "id": "2026-06-20-v0.1.4-evidence-based-skill-lifecycle",
+  "project": "decodex",
+  "date": "2026-06-20",
+  "goal": "Finalize the v0.1.3 supervised self-improving loop.",
+  "validation": {
+    "commands": [
+      "python -m unittest discover -s tests -v",
+      "python tools\\decodex.py validate --root .",
+      "python tools\\decodex.py audit --root ."
+    ],
+    "results": [
+      "recorded"
+    ]
+  },
+  "lessons": {
+    "project": [
+      "v0.1.4 formalizes evidence-based skill lifecycle",
+      "one evaluation keeps context-compliance-review in candidate mode with low confidence"
+    ],
+    "global_candidates": [
+      "skill evaluations and reviews are append-only",
+      "compiled context exposes version status and recommendation",
+      "context-compliance-review"
+    ]
+  },
+  "artifacts": [
+    "projects/decodex/sessions/2026-06-20-v0.1.4-evidence-based-skill-lifecycle/compliance-report.md",
+    "projects/decodex/sessions/2026-06-20-v0.1.4-evidence-based-skill-lifecycle/feedback.yaml",
+    "projects/decodex/sessions/2026-06-20-v0.1.4-evidence-based-skill-lifecycle/session-close.json",
+    "projects/decodex/skills/context-compliance-review/evaluations/2026-06-20-v0.1.4-evidence-based-skill-lifecycle/evaluation.yaml",
+    "projects/decodex/skills/context-compliance-review/reviews/2026-06-20-v0.1.4-evidence-based-skill-lifecycle/review.yaml",
+    "compliance-report.md",
+    "feedback.yaml",
+    "session-close.json"
+  ]
+}

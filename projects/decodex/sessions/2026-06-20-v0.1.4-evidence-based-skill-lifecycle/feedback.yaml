@@ -1,0 +1,13 @@
+context_feedback:
+useful_rules:
+  - skill evaluations and reviews are append-only
+  - compiled context exposes version status and recommendation
+
+missing_rules:
+  - none
+
+ambiguous_rules:
+  - none
+
+skill_candidates:
+  - context-compliance-review

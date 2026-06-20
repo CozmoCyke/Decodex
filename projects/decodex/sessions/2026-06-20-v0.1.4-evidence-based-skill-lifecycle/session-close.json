@@ -1,0 +1,37 @@
+{
+  "id": "2026-06-20-v0.1.4-evidence-based-skill-lifecycle",
+  "project": "decodex",
+  "context_check_passed": true,
+  "git": {
+    "branch": "main",
+    "head": "f540c70",
+    "status": "## main...origin/main\n M .codex/AGENTS.md\n M .codex/inherited-skills.md\n M .codex/project-context.md\n M .codex/provenance.json\n M .github/workflows/decodex.yml\n M decodex.yaml\n M decodex_core.py\n M projects/decodex/skills/context-compliance-review/skill.yaml\n M schemas/decodex.schema.json\n M schemas/skill.schema.json\n M tools/decodex.py\n?? projects/decodex/sessions/2026-06-20-v0.1.4-evidence-based-skill-lifecycle/\n?? projects/decodex/skills/context-compliance-review/evaluations/\n?? projects/decodex/skills/context-compliance-review/reviews/\n?? projects/decodex/skills/context-compliance-review/versions/\n?? schemas/skill-evaluation.schema.json\n?? schemas/skill-review.schema.json\n?? schemas/skill-revision.schema.json\n?? tests/test_skill_lifecycle.py"
+  },
+  "tests": [
+    "python -m unittest discover -s tests -v",
+    "python tools\\decodex.py validate --root .",
+    "python tools\\decodex.py audit --root ."
+  ],
+  "lessons": [
+    "v0.1.4 formalizes evidence-based skill lifecycle",
+    "one evaluation keeps context-compliance-review in candidate mode with low confidence"
+  ],
+  "artifacts": [
+    "projects/decodex/sessions/2026-06-20-v0.1.4-evidence-based-skill-lifecycle/compliance-report.md",
+    "projects/decodex/sessions/2026-06-20-v0.1.4-evidence-based-skill-lifecycle/feedback.yaml",
+    "projects/decodex/sessions/2026-06-20-v0.1.4-evidence-based-skill-lifecycle/session-close.json",
+    "projects/decodex/skills/context-compliance-review/evaluations/2026-06-20-v0.1.4-evidence-based-skill-lifecycle/evaluation.yaml",
+    "projects/decodex/skills/context-compliance-review/reviews/2026-06-20-v0.1.4-evidence-based-skill-lifecycle/review.yaml"
+  ],
+  "feedback": {
+    "useful_rules": [
+      "skill evaluations and reviews are append-only",
+      "compiled context exposes version status and recommendation"
+    ],
+    "missing_rules": [],
+    "ambiguous_rules": [],
+    "skill_candidates": [
+      "context-compliance-review"
+    ]
+  }
+}

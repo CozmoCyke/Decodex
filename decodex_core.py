@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import difflib
 import json
 import os
 import re
@@ -241,6 +242,24 @@ def validate_repository(root: Path) -> list[str]:
         except DecodexError as exc:
             errors.append(str(exc))
 
+    for evaluation_path in _discover_skill_artifact_files(root, "evaluations"):
+        try:
+            errors.extend(validate_json_schema_file(evaluation_path, root / "schemas" / "skill-evaluation.schema.json"))
+        except DecodexError as exc:
+            errors.append(str(exc))
+
+    for review_path in _discover_skill_artifact_files(root, "reviews"):
+        try:
+            errors.extend(validate_json_schema_file(review_path, root / "schemas" / "skill-review.schema.json"))
+        except DecodexError as exc:
+            errors.append(str(exc))
+
+    for revision_path in _discover_skill_artifact_files(root, "revisions"):
+        try:
+            errors.extend(validate_json_schema_file(revision_path, root / "schemas" / "skill-revision.schema.json"))
+        except DecodexError as exc:
+            errors.append(str(exc))
+
     return errors
 
 
@@ -252,6 +271,7 @@ def audit_repository(root: Path) -> list[str]:
     errors.extend(_audit_project_structure(root))
     errors.extend(_audit_sessions(root))
     errors.extend(_audit_promotions(root))
+    errors.extend(_audit_skill_lifecycle(root))
     errors.extend(_audit_absolute_paths(root))
     errors.extend(_audit_tracked_generated_files(root))
     errors.extend(_audit_evidence_references(root))
@@ -264,6 +284,12 @@ def _discover_skill_files(root: Path) -> list[Path]:
         if not base.exists():
             continue
         for path in base.rglob("skill.yaml"):
+            try:
+                relative = path.relative_to(base)
+            except ValueError:
+                continue
+            if any(part in {"versions", "evaluations", "reviews", "revisions"} for part in relative.parts[:-1]):
+                continue
             files.append(path)
     return sorted({path.resolve() for path in files})
 
@@ -284,7 +310,7 @@ def _discover_session_files(root: Path) -> list[Path]:
     if not projects_dir.exists():
         return []
     for path in projects_dir.rglob("session.yaml"):
-            files.append(path)
+        files.append(path)
     return sorted({path.resolve() for path in files})
 
 
@@ -293,10 +319,23 @@ def _discover_decision_files(root: Path) -> list[Path]:
     projects_dir = root / "projects"
     if not projects_dir.exists():
         return []
-    for path in projects_dir.rglob("decision.json"):
-        files.append(path)
-    for path in projects_dir.rglob("decision.yaml"):
-        files.append(path)
+    for path in projects_dir.rglob("decisions/*"):
+        if path.is_file() and path.suffix.lower() in {".json", ".yaml", ".yml"}:
+            files.append(path)
+    return sorted({path.resolve() for path in files})
+
+
+def _discover_skill_artifact_files(root: Path, artifact_kind: str) -> list[Path]:
+    files: list[Path] = []
+    for base in [root / "global" / "skills", root / "projects"]:
+        if not base.exists():
+            continue
+        for artifact_root in base.rglob(artifact_kind):
+            if not artifact_root.is_dir():
+                continue
+            for pattern in ("*.json", "*.yaml", "*.yml"):
+                for path in artifact_root.rglob(pattern):
+                    files.append(path)
     return sorted({path.resolve() for path in files})
 
 
@@ -378,25 +417,39 @@ def promote_skill(
     if target_dir.exists():
         if not force:
             raise DecodexError(f"target skill already exists: {target_dir}")
-        shutil.rmtree(target_dir)
-
-    target_dir.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copytree(source_dir, target_dir)
+        version = _load_skill_version(source_dir)
+        snapshot_dir = _skill_version_snapshot_dir(target_dir, version)
+        if snapshot_dir.exists():
+            snapshot_dir = target_dir / "versions" / f"{version or 'snapshot'}-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
+        snapshot_dir.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copytree(source_dir, snapshot_dir, dirs_exist_ok=False)
+        final_target = snapshot_dir
+    else:
+        target_dir.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copytree(source_dir, target_dir)
+        final_target = target_dir
 
     history = root / "registry" / "promotion-history.jsonl"
     history.parent.mkdir(parents=True, exist_ok=True)
+    source_skill = _safe_load_skill(source_dir / "skill.yaml")
     event = {
         "ts": datetime.now(timezone.utc).isoformat(),
         "skill_id": skill_id,
+        "skill_version": source_skill.get("version"),
         "from": from_scope,
         "to": to_scope,
         "project": project,
         "source_path": str(source_dir.relative_to(root)),
-        "target_path": str(target_dir.relative_to(root)),
+        "target_path": str(final_target.relative_to(root)),
+        "source_hash": _sha256_file(source_dir / "skill.yaml") if (source_dir / "skill.yaml").exists() else None,
+        "target_hash": _sha256_file(final_target / "skill.yaml") if (final_target / "skill.yaml").exists() else None,
+        "evaluation_ids": _skill_evaluation_ids(source_dir),
+        "review_id": _latest_skill_artifact_id(source_dir, "reviews"),
+        "approved_by": _latest_skill_approval(source_dir),
     }
     with history.open("a", encoding="utf-8") as fh:
         fh.write(json.dumps(event, ensure_ascii=True) + "\n")
-    return source_dir, target_dir
+    return source_dir, final_target
 
 
 def _skill_dir(root: Path, skill_id: str, scope: str, *, project: str | None) -> Path:
@@ -407,6 +460,93 @@ def _skill_dir(root: Path, skill_id: str, scope: str, *, project: str | None) ->
             raise DecodexError("project is required when scope is project")
         return root / "projects" / project / "skills" / skill_id
     raise DecodexError(f"unknown scope: {scope}")
+
+
+def _skill_version_snapshot_dir(skill_dir: Path, version: str | None) -> Path:
+    safe_version = version or datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
+    return skill_dir / "versions" / safe_version
+
+
+def _safe_load_skill(path: Path) -> dict[str, Any]:
+    if not path.exists():
+        return {}
+    try:
+        data = load_jsonish(path)
+    except DecodexError:
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def _load_skill_version(skill_dir: Path) -> str | None:
+    version = _safe_load_skill(skill_dir / "skill.yaml").get("version")
+    return version if isinstance(version, str) and version else None
+
+
+def _skill_evaluation_ids(skill_dir: Path) -> list[str]:
+    ids: list[str] = []
+    evaluation_root = skill_dir / "evaluations"
+    if not evaluation_root.exists():
+        return ids
+    for path in sorted(evaluation_root.rglob("evaluation.yaml")):
+        try:
+            evaluation = load_jsonish(path)
+        except DecodexError:
+            continue
+        if isinstance(evaluation, dict):
+            evaluation_id = evaluation.get("id")
+            if isinstance(evaluation_id, str) and evaluation_id:
+                ids.append(evaluation_id)
+    return ids
+
+
+def _latest_skill_artifact(skill_dir: Path, folder: str) -> tuple[dict[str, Any] | None, Path | None]:
+    artifact_root = skill_dir / folder
+    if not artifact_root.exists():
+        return None, None
+    candidates = sorted(
+        {
+            path.resolve()
+            for pattern in ("*.json", "*.yaml", "*.yml")
+            for path in artifact_root.rglob(pattern)
+            if path.is_file()
+        }
+    )
+    if not candidates:
+        return None, None
+    path = candidates[-1]
+    try:
+        data = load_jsonish(path)
+    except DecodexError:
+        return None, path
+    return (data if isinstance(data, dict) else None), path
+
+
+def _latest_skill_artifact_id(skill_dir: Path, folder: str) -> str | None:
+    artifact, _ = _latest_skill_artifact(skill_dir, folder)
+    if not artifact:
+        return None
+    artifact_id = artifact.get("id")
+    return artifact_id if isinstance(artifact_id, str) and artifact_id else None
+
+
+def _latest_skill_approval(skill_dir: Path) -> str | None:
+    review, _ = _latest_skill_artifact(skill_dir, "reviews")
+    if not review:
+        return None
+    approved_by = review.get("approved_by")
+    return approved_by if isinstance(approved_by, str) and approved_by else None
+
+
+def _resolve_skill_snapshot_file(skill_dir: Path, version: str) -> Path:
+    snapshot_file = _skill_version_snapshot_dir(skill_dir, version) / "skill.yaml"
+    if snapshot_file.exists():
+        return snapshot_file
+    active_file = skill_dir / "skill.yaml"
+    if active_file.exists():
+        active_skill = _safe_load_skill(active_file)
+        if active_skill.get("version") == version:
+            return active_file
+    return snapshot_file
 
 
 def build_context(root: Path, *, project: str, output_root: Path) -> Path:
@@ -434,18 +574,52 @@ def _list_skill_records(root: Path, base: Path) -> list[dict[str, Any]]:
     records: list[dict[str, Any]] = []
     for skill_file in sorted(base.rglob("skill.yaml")):
         try:
+            relative = skill_file.relative_to(base)
+        except ValueError:
+            continue
+        if any(part in {"versions", "evaluations", "reviews", "revisions"} for part in relative.parts[:-1]):
+            continue
+        try:
             skill = load_jsonish(skill_file)
         except DecodexError:
             continue
         skill_id = skill.get("id")
         if isinstance(skill_id, str):
+            review, review_path = _latest_skill_artifact(skill_file.parent, "reviews")
+            evaluation, evaluation_path = _latest_skill_artifact(skill_file.parent, "evaluations")
+            lifecycle = skill.get("lifecycle", {})
+            lifecycle_data = lifecycle if isinstance(lifecycle, dict) else {}
             record = {
                 "id": skill_id,
                 "title": skill.get("title", skill_id),
+                "version": skill.get("version", "unknown"),
+                "status": skill.get("status", "unknown"),
                 "scope": skill.get("scope", "unknown"),
                 "origin_project": skill.get("origin_project") or _infer_origin_project(skill_file),
                 "confidence": skill.get("confidence", "unknown"),
                 "evidence": skill.get("evidence", []),
+                "lifecycle": lifecycle_data,
+                "latest_evaluation": {
+                    "id": evaluation.get("id"),
+                    "recommendation": evaluation.get("recommendation"),
+                    "path": evaluation_path.relative_to(root).as_posix() if evaluation_path else None,
+                }
+                if evaluation
+                else None,
+                "latest_review": {
+                    "id": review.get("id"),
+                    "recommendation": review.get("recommendation"),
+                    "approved_by": review.get("approved_by"),
+                    "path": review_path.relative_to(root).as_posix() if review_path else None,
+                }
+                if review
+                else None,
+                "recommendation": (
+                    (review or evaluation or {}).get("recommendation")
+                    or lifecycle_data.get("latest_recommendation")
+                    or skill.get("recommendation")
+                    or "unknown"
+                ),
                 "source_path": skill_file.relative_to(root).as_posix(),
             }
             records.append(record)
@@ -488,7 +662,7 @@ def _build_context_bundle(root: Path, project: str) -> dict[str, Any]:
             },
             {
                 "id": "no-auto-global-promotion",
-                "statement": "Never promote global skills automatically in v0.1.3.",
+                "statement": "Never promote global skills automatically without review evidence in v0.1.4.",
                 "source": "projects/decodex/sessions/2026-06-20-v0.1.3-self-improving-development-loop/session.yaml",
                 "scope": "project",
             },
@@ -559,8 +733,13 @@ def _render_context_files(bundle: dict[str, Any]) -> dict[str, str]:
     ])
     if project_skills:
         for skill in project_skills:
+            latest_review = skill.get("latest_review") or {}
+            latest_evaluation = skill.get("latest_evaluation") or {}
             project_context.append(
-                f"- {skill['id']} | {skill.get('title', skill['id'])} | origin={skill.get('origin_project', 'unknown')}"
+                f"- {skill['id']} | {skill.get('title', skill['id'])} | version={skill.get('version', 'unknown')} | "
+                f"status={skill.get('status', 'unknown')} | origin={skill.get('origin_project', 'unknown')} | "
+                f"confidence={skill.get('confidence', 'unknown')} | recommendation={skill.get('recommendation', 'unknown')} | "
+                f"review={latest_review.get('id', 'none')} | evaluation={latest_evaluation.get('id', 'none')}"
             )
     else:
         project_context.append("- None")
@@ -573,9 +752,12 @@ def _render_context_files(bundle: dict[str, Any]) -> dict[str, str]:
     if inherited_skills:
         for skill in inherited_skills:
             evidence = ", ".join(skill.get("evidence", [])) or "none"
+            latest_review = skill.get("latest_review") or {}
             inherited_lines.append(
-                f"- {skill['id']} | scope={skill.get('scope', 'global')} | "
-                f"origin_project={skill.get('origin_project', 'unknown')} | evidence={evidence}"
+                f"- {skill['id']} | version={skill.get('version', 'unknown')} | status={skill.get('status', 'unknown')} | "
+                f"scope={skill.get('scope', 'global')} | origin_project={skill.get('origin_project', 'unknown')} | "
+                f"confidence={skill.get('confidence', 'unknown')} | recommendation={skill.get('recommendation', 'unknown')} | "
+                f"review={latest_review.get('id', 'none')} | evidence={evidence}"
             )
     else:
         inherited_lines.append("- None")
@@ -620,10 +802,13 @@ def _collect_context_sources(root: Path, project: str) -> list[dict[str, Any]]:
         root / "registry" / "skills-index.yaml",
         root / "registry" / "projects-index.yaml",
         root / "projects" / project / "project.yaml",
-        root / "projects" / project / "decisions" / "0001-supervised-self-improving-loop.json",
     ]
+    source_paths.extend(_discover_decision_files(root))
     source_paths.extend(sorted((root / "global" / "skills").rglob("skill.yaml")))
     source_paths.extend(sorted((root / "projects" / project / "skills").rglob("skill.yaml")))
+    source_paths.extend(_discover_skill_artifact_files(root, "evaluations"))
+    source_paths.extend(_discover_skill_artifact_files(root, "reviews"))
+    source_paths.extend(_discover_skill_artifact_files(root, "revisions"))
     refs: list[dict[str, Any]] = []
     for path in source_paths:
         if not path.exists() or not path.is_file():
@@ -642,7 +827,7 @@ def _list_decision_records(root: Path, project: str) -> list[dict[str, Any]]:
     if not decision_dir.exists():
         return []
     records: list[dict[str, Any]] = []
-    for path in sorted(decision_dir.glob("*.json")):
+    for path in sorted(path for path in decision_dir.iterdir() if path.is_file() and path.suffix.lower() in {".json", ".yaml", ".yml"}):
         try:
             decision = load_jsonish(path)
         except DecodexError:
@@ -885,7 +1070,7 @@ def session_close(
 
     feedback_yaml = _render_feedback_yaml(session_close_data["feedback"])
     write_template_text(session_dir / "feedback.yaml", feedback_yaml, force=True)
-    _write_skill_candidates(root, project, session_dir, skill_candidates, feedback_yaml)
+    _write_skill_candidates(root, project, session_dir, skill_candidates, feedback_yaml, session_close_data)
 
     session_summary = {
         "id": session,
@@ -1015,81 +1200,350 @@ def _write_skill_candidates(
     session_dir: Path,
     skill_candidates: list[str],
     feedback_yaml: str,
+    session_close_data: dict[str, Any],
 ) -> None:
     candidate_root = root / "projects" / project / "skills"
     candidate_root.mkdir(parents=True, exist_ok=True)
     for skill_id in skill_candidates:
         skill_dir = candidate_root / skill_id
         skill_dir.mkdir(parents=True, exist_ok=True)
-        skill_data = {
-            "id": skill_id,
-            "title": "Context Compliance Review",
-            "version": "0.1.0",
-            "status": "candidate",
-            "scope": "project",
-            "origin_project": project,
-            "origin_projects": [project],
-            "tags": ["context", "provenance", "compliance", "validation", "loop"],
-            "problem": {
-                "summary": "Review generated context against source memory before applying a change.",
-            },
-            "when_to_use": [
-                "a generated .codex context needs to be checked before development work",
-                "a session must record whether the context improved the work",
-            ],
-            "preconditions": [
-                "provenance.json exists",
-                "validation commands are recorded",
-                "the session has a compliance report",
-            ],
-            "procedure": [
-                "run context-check",
-                "compare context against source memory",
-                "capture gaps and ambiguities",
-                "record a feedback summary",
-                "wait for human review before promotion",
-            ],
-            "validation": {
-                "required": [
-                    "compliance report exists",
-                    "feedback recorded",
-                    "human validation required",
-                ]
-            },
-            "evidence": [
-                str((session_dir / "compliance-report.md").relative_to(root).as_posix()),
-                str((session_dir / "feedback.yaml").relative_to(root).as_posix()),
-            ],
-            "confidence": "medium",
-            "last_reviewed": datetime.now(timezone.utc).date().isoformat(),
+        skill_file = skill_dir / "skill.yaml"
+        if skill_file.exists():
+            skill_data = _safe_load_skill(skill_file)
+        else:
+            skill_data = {
+                "id": skill_id,
+                "title": "Context Compliance Review",
+                "version": "0.1.0",
+                "status": "candidate",
+                "scope": "project",
+                "origin_project": project,
+                "origin_projects": [project],
+                "tags": ["context", "provenance", "compliance", "validation", "loop"],
+                "problem": {
+                    "summary": "Review generated context against source memory before applying a change.",
+                },
+                "when_to_use": [
+                    "a generated .codex context needs to be checked before development work",
+                    "a session must record whether the context improved the work",
+                ],
+                "preconditions": [
+                    "provenance.json exists",
+                    "validation commands are recorded",
+                    "the session has a compliance report",
+                ],
+                "procedure": [
+                    "run context-check",
+                    "compare context against source memory",
+                    "capture gaps and ambiguities",
+                    "record a feedback summary",
+                    "wait for human review before promotion",
+                ],
+                "validation": {
+                    "required": [
+                        "compliance report exists",
+                        "feedback recorded",
+                        "human validation required",
+                    ]
+                },
+                "evidence": [],
+                "confidence": "low",
+                "recommendation": "continue_evaluation",
+                "lifecycle": {
+                    "state": "candidate",
+                    "latest_recommendation": "continue_evaluation",
+                },
+            }
+            dump_jsonish(skill_file, skill_data)
+            write_template_text(
+                skill_dir / "SKILL.md",
+                "\n".join(
+                    [
+                        "# Context Compliance Review",
+                        "",
+                        "## Goal",
+                        "",
+                        "Review a generated Decodex context against source memory before applying changes.",
+                        "",
+                        "## Procedure",
+                        "",
+                        "1. Run `decodex context-check`.",
+                        "2. Compare context against source memory.",
+                        "3. Record gaps, ambiguities, and useful rules.",
+                        "4. Keep the skill in project scope until a human reviews it.",
+                        "",
+                        "## Evidence",
+                        "",
+                        f"- {str((session_dir / 'compliance-report.md').relative_to(root).as_posix())}",
+                        f"- {str((session_dir / 'feedback.yaml').relative_to(root).as_posix())}",
+                        "",
+                    ]
+                ),
+                force=True,
+            )
+
+        skill_version = skill_data.get("version", "0.1.0")
+        snapshot_dir = _skill_version_snapshot_dir(skill_dir, skill_version if isinstance(skill_version, str) else None)
+        snapshot_dir.mkdir(parents=True, exist_ok=True)
+        if not (snapshot_dir / "skill.yaml").exists():
+            dump_jsonish(snapshot_dir / "skill.yaml", skill_data)
+
+        evidence_paths = [
+            str((session_dir / "compliance-report.md").relative_to(root).as_posix()),
+            str((session_dir / "feedback.yaml").relative_to(root).as_posix()),
+        ]
+        evaluation = {
+            "id": session_close_data["id"],
+            "skill_id": skill_id,
+            "skill_version": skill_version,
+            "project": project,
+            "session": session_close_data["id"],
+            "status": "passed" if session_close_data["context_check_passed"] else "needs_revision",
+            "runs": max(len(session_close_data.get("tests", [])), 1),
+            "successful_runs": max(len(session_close_data.get("tests", [])), 1) if session_close_data["context_check_passed"] else 0,
+            "confidence": "low",
+            "recommendation": "continue_evaluation",
+            "evidence": evidence_paths,
+            "contradictions": session_close_data["feedback"]["ambiguous_rules"],
+            "notes": session_close_data.get("lessons", []),
         }
-        dump_jsonish(skill_dir / "skill.yaml", skill_data)
-        write_template_text(
-            skill_dir / "SKILL.md",
-            "\n".join(
-                [
-                    "# Context Compliance Review",
-                    "",
-                    "## Goal",
-                    "",
-                    "Review a generated Decodex context against source memory before applying changes.",
-                    "",
-                    "## Procedure",
-                    "",
-                    "1. Run `decodex context-check`.",
-                    "2. Compare context against source memory.",
-                    "3. Record gaps, ambiguities, and useful rules.",
-                    "4. Keep the skill in project scope until a human reviews it.",
-                    "",
-                    "## Evidence",
-                    "",
-                    f"- {str((session_dir / 'compliance-report.md').relative_to(root).as_posix())}",
-                    f"- {str((session_dir / 'feedback.yaml').relative_to(root).as_posix())}",
-                    "",
-                ]
-            ),
-            force=True,
+        evaluation_dir = skill_dir / "evaluations" / session_close_data["id"]
+        evaluation_dir.mkdir(parents=True, exist_ok=True)
+        dump_jsonish(evaluation_dir / "evaluation.yaml", evaluation)
+        write_template_text(evaluation_dir / "evaluation.md", _render_skill_evaluation(evaluation), force=True)
+
+        review = {
+            "id": f"{session_close_data['id']}-review",
+            "skill_id": skill_id,
+            "skill_version": skill_version,
+            "project": project,
+            "reviewer": "decodex",
+            "evaluation_ids": [evaluation["id"]],
+            "recommendation": "continue_evaluation",
+            "confidence": "low",
+            "evidence": evidence_paths,
+            "notes": session_close_data.get("lessons", []),
+        }
+        review_dir = skill_dir / "reviews" / session_close_data["id"]
+        review_dir.mkdir(parents=True, exist_ok=True)
+        dump_jsonish(review_dir / "review.yaml", review)
+        write_template_text(review_dir / "review.md", _render_skill_review(review), force=True)
+
+
+def _render_skill_evaluation(evaluation: dict[str, Any]) -> str:
+    lines = [
+        "# Skill Evaluation",
+        "",
+        f"- id: {evaluation['id']}",
+        f"- skill_id: {evaluation['skill_id']}",
+        f"- skill_version: {evaluation['skill_version']}",
+        f"- recommendation: {evaluation['recommendation']}",
+        f"- confidence: {evaluation['confidence']}",
+        f"- runs: {evaluation['runs']}",
+        f"- successful_runs: {evaluation['successful_runs']}",
+        "",
+        "## Evidence",
+    ]
+    for evidence in evaluation.get("evidence", []):
+        lines.append(f"- {evidence}")
+    lines.append("")
+    return "\n".join(lines)
+
+
+def _render_skill_review(review: dict[str, Any]) -> str:
+    lines = [
+        "# Skill Review",
+        "",
+        f"- id: {review['id']}",
+        f"- skill_id: {review['skill_id']}",
+        f"- skill_version: {review['skill_version']}",
+        f"- recommendation: {review['recommendation']}",
+        f"- approved_by: {review.get('approved_by') or 'none'}",
+        "",
+        "## Evaluation IDs",
+    ]
+    for evaluation_id in review.get("evaluation_ids", []):
+        lines.append(f"- {evaluation_id}")
+    lines.append("")
+    return "\n".join(lines)
+
+
+def skill_evaluate(
+    root: Path,
+    *,
+    skill_id: str,
+    project: str,
+    evaluation_id: str,
+    scope: str = "project",
+    recommendation: str = "continue_evaluation",
+    confidence: str = "low",
+    evidence: list[str] | None = None,
+    notes: list[str] | None = None,
+    runs: int = 1,
+    successful_runs: int | None = None,
+) -> Path:
+    skill_dir = _skill_dir(root, skill_id, scope, project=project if scope == "project" else None)
+    skill_file = skill_dir / "skill.yaml"
+    if not skill_file.exists():
+        raise DecodexError(f"skill not found: {skill_file}")
+    skill_data = _safe_load_skill(skill_file)
+    skill_version = skill_data.get("version", "0.1.0")
+    evaluation_dir = skill_dir / "evaluations" / evaluation_id
+    evaluation_dir.mkdir(parents=True, exist_ok=False)
+    evaluation = {
+        "id": evaluation_id,
+        "skill_id": skill_id,
+        "skill_version": skill_version,
+        "project": project,
+        "session": evaluation_id,
+        "status": "passed",
+        "runs": runs,
+        "successful_runs": successful_runs if successful_runs is not None else runs,
+        "confidence": confidence,
+        "recommendation": recommendation,
+        "evidence": evidence or [],
+        "contradictions": [],
+        "notes": notes or [],
+    }
+    dump_jsonish(evaluation_dir / "evaluation.yaml", evaluation)
+    write_template_text(evaluation_dir / "evaluation.md", _render_skill_evaluation(evaluation), force=True)
+    return evaluation_dir / "evaluation.yaml"
+
+
+def skill_review(
+    root: Path,
+    *,
+    skill_id: str,
+    project: str,
+    review_id: str,
+    scope: str = "project",
+    evaluation_ids: list[str] | None = None,
+    recommendation: str = "continue_evaluation",
+    approved_by: str | None = None,
+    confidence: str = "low",
+    notes: list[str] | None = None,
+) -> Path:
+    skill_dir = _skill_dir(root, skill_id, scope, project=project if scope == "project" else None)
+    skill_file = skill_dir / "skill.yaml"
+    if not skill_file.exists():
+        raise DecodexError(f"skill not found: {skill_file}")
+    skill_data = _safe_load_skill(skill_file)
+    skill_version = skill_data.get("version", "0.1.0")
+    review_dir = skill_dir / "reviews" / review_id
+    review_dir.mkdir(parents=True, exist_ok=False)
+    review = {
+        "id": review_id,
+        "skill_id": skill_id,
+        "skill_version": skill_version,
+        "project": project,
+        "reviewer": "decodex",
+        "evaluation_ids": evaluation_ids or [],
+        "recommendation": recommendation,
+        "confidence": confidence,
+        "evidence": [],
+        "notes": notes or [],
+    }
+    if approved_by is not None:
+        review["approved_by"] = approved_by
+    dump_jsonish(review_dir / "review.yaml", review)
+    write_template_text(review_dir / "review.md", _render_skill_review(review), force=True)
+    return review_dir / "review.yaml"
+
+
+def skill_revise(
+    root: Path,
+    *,
+    skill_id: str,
+    project: str,
+    revision_id: str,
+    to_version: str,
+    scope: str = "project",
+    status: str | None = None,
+    summary: str = "",
+    rationale: str = "",
+    evaluation_ids: list[str] | None = None,
+) -> tuple[Path, Path]:
+    skill_dir = _skill_dir(root, skill_id, scope, project=project if scope == "project" else None)
+    skill_file = skill_dir / "skill.yaml"
+    if not skill_file.exists():
+        raise DecodexError(f"skill not found: {skill_file}")
+    current_skill = _safe_load_skill(skill_file)
+    from_version = current_skill.get("version", "0.1.0")
+    previous_snapshot = _skill_version_snapshot_dir(skill_dir, from_version if isinstance(from_version, str) else None)
+    previous_snapshot.mkdir(parents=True, exist_ok=True)
+    if not (previous_snapshot / "skill.yaml").exists():
+        dump_jsonish(previous_snapshot / "skill.yaml", current_skill)
+
+    revised_skill = dict(current_skill)
+    revised_skill["version"] = to_version
+    if status is not None:
+        revised_skill["status"] = status
+    lifecycle = revised_skill.get("lifecycle")
+    if not isinstance(lifecycle, dict):
+        lifecycle = {}
+    lifecycle["state"] = revised_skill.get("status", lifecycle.get("state", "candidate"))
+    lifecycle["latest_revision_id"] = revision_id
+    lifecycle["latest_recommendation"] = lifecycle.get("latest_recommendation", "project_validated")
+    revised_skill["lifecycle"] = lifecycle
+    dump_jsonish(skill_file, revised_skill)
+
+    snapshot_dir = _skill_version_snapshot_dir(skill_dir, to_version)
+    snapshot_dir.mkdir(parents=True, exist_ok=True)
+    dump_jsonish(snapshot_dir / "skill.yaml", revised_skill)
+
+    revision_dir = skill_dir / "revisions" / revision_id
+    revision_dir.mkdir(parents=True, exist_ok=False)
+    revision = {
+        "id": revision_id,
+        "skill_id": skill_id,
+        "project": project,
+        "from_version": from_version,
+        "to_version": to_version,
+        "summary": summary,
+        "rationale": rationale,
+        "evaluation_ids": evaluation_ids or [],
+        "status": "applied",
+    }
+    dump_jsonish(revision_dir / "revision.yaml", revision)
+    write_template_text(
+        revision_dir / "revision.md",
+        "\n".join(
+            [
+                "# Skill Revision",
+                "",
+                f"- id: {revision_id}",
+                f"- skill_id: {skill_id}",
+                f"- from_version: {from_version}",
+                f"- to_version: {to_version}",
+                f"- summary: {summary or 'none'}",
+                f"- rationale: {rationale or 'none'}",
+                "",
+            ]
+        ),
+        force=True,
+    )
+    return skill_file, revision_dir / "revision.yaml"
+
+
+def skill_diff(root: Path, *, skill_id: str, project: str, left_version: str, right_version: str, scope: str = "project") -> str:
+    skill_dir = _skill_dir(root, skill_id, scope, project=project if scope == "project" else None)
+    left_file = _resolve_skill_snapshot_file(skill_dir, left_version)
+    right_file = _resolve_skill_snapshot_file(skill_dir, right_version)
+    if not left_file.exists():
+        raise DecodexError(f"missing skill snapshot: {left_file}")
+    if not right_file.exists():
+        raise DecodexError(f"missing skill snapshot: {right_file}")
+    left_text = json.dumps(_safe_load_skill(left_file), indent=2, sort_keys=True, ensure_ascii=True).splitlines()
+    right_text = json.dumps(_safe_load_skill(right_file), indent=2, sort_keys=True, ensure_ascii=True).splitlines()
+    return "\n".join(
+        difflib.unified_diff(
+            left_text,
+            right_text,
+            fromfile=left_file.as_posix(),
+            tofile=right_file.as_posix(),
+            lineterm="",
         )
+    )
 
 
 def _infer_origin_project(skill_file: Path) -> str:
@@ -1117,9 +1571,20 @@ def _audit_schema_compatibility(root: Path) -> list[str]:
 
     expected = schema.get("x-decodex-version")
     actual = manifest.get("version")
-    if expected and actual != expected:
-        errors.append(f"{manifest_path}: version {actual!r} is incompatible with schema {expected!r}")
+    if expected and actual:
+        if _version_tuple(str(actual)) < _version_tuple(str(expected)):
+            errors.append(f"{manifest_path}: version {actual!r} is incompatible with schema {expected!r}")
     return errors
+
+
+def _version_tuple(value: str) -> tuple[int, ...]:
+    parts: list[int] = []
+    for piece in value.split("."):
+        try:
+            parts.append(int(piece))
+        except ValueError:
+            break
+    return tuple(parts)
 
 
 def _audit_indexes(root: Path) -> list[str]:
@@ -1283,6 +1748,23 @@ def _audit_promotions(root: Path) -> list[str]:
             errors.append(f"{history}:{line_no}: missing provenance source file {source_path}")
         if not isinstance(target_path, str) or not target_path:
             errors.append(f"{history}:{line_no}: missing provenance target_path")
+        source_hash = event.get("source_hash")
+        target_hash = event.get("target_hash")
+        if source_hash is not None and not isinstance(source_hash, str):
+            errors.append(f"{history}:{line_no}: source_hash must be a string")
+        if target_hash is not None and not isinstance(target_hash, str):
+            errors.append(f"{history}:{line_no}: target_hash must be a string")
+        evaluation_ids = event.get("evaluation_ids", [])
+        if isinstance(evaluation_ids, list):
+            for evaluation_id in evaluation_ids:
+                if not isinstance(evaluation_id, str):
+                    errors.append(f"{history}:{line_no}: evaluation_ids must contain strings")
+        review_id = event.get("review_id")
+        if review_id is not None and not isinstance(review_id, str):
+            errors.append(f"{history}:{line_no}: review_id must be a string")
+        approved_by = event.get("approved_by")
+        if approved_by is not None and not isinstance(approved_by, str):
+            errors.append(f"{history}:{line_no}: approved_by must be a string")
     return errors
 
 
@@ -1356,6 +1838,106 @@ def _audit_evidence_references(root: Path) -> list[str]:
     return errors
 
 
+def _audit_skill_lifecycle(root: Path) -> list[str]:
+    errors: list[str] = []
+    for skill_file in _discover_skill_files(root):
+        try:
+            skill = load_jsonish(skill_file)
+        except DecodexError as exc:
+            errors.append(str(exc))
+            continue
+        if not isinstance(skill, dict):
+            continue
+        skill_id = skill.get("id")
+        skill_dir = skill_file.parent
+        if not isinstance(skill_id, str) or not skill_id:
+            continue
+
+        version = skill.get("version")
+        if isinstance(version, str) and version:
+            snapshot_file = skill_dir / "versions" / version / "skill.yaml"
+            if snapshot_file.exists():
+                try:
+                    snapshot = load_jsonish(snapshot_file)
+                except DecodexError as exc:
+                    errors.append(str(exc))
+                else:
+                    if isinstance(snapshot, dict):
+                        if snapshot.get("id") != skill_id:
+                            errors.append(f"{snapshot_file}: snapshot id does not match {skill_id}")
+                        if snapshot.get("version") != version:
+                            errors.append(f"{snapshot_file}: snapshot version does not match {version}")
+
+        evaluation_root = skill_dir / "evaluations"
+        if evaluation_root.exists():
+            for evaluation_file in sorted(evaluation_root.rglob("evaluation.yaml")):
+                try:
+                    evaluation = load_jsonish(evaluation_file)
+                except DecodexError as exc:
+                    errors.append(str(exc))
+                    continue
+                if not isinstance(evaluation, dict):
+                    continue
+                if evaluation.get("skill_id") != skill_id:
+                    errors.append(f"{evaluation_file}: skill_id does not match {skill_id}")
+                evidence = evaluation.get("evidence", [])
+                if isinstance(evidence, list):
+                    for evidence_path in evidence:
+                        if isinstance(evidence_path, str) and evidence_path and not (root / evidence_path).exists():
+                            errors.append(f"{evaluation_file}: missing evidence file {evidence_path}")
+
+        review_root = skill_dir / "reviews"
+        if review_root.exists():
+            evaluation_ids: set[str] = set()
+            for evaluation_file in sorted(evaluation_root.rglob("evaluation.yaml")) if evaluation_root.exists() else []:
+                try:
+                    evaluation = load_jsonish(evaluation_file)
+                except DecodexError:
+                    continue
+                if isinstance(evaluation, dict):
+                    evaluation_id = evaluation.get("id")
+                    if isinstance(evaluation_id, str) and evaluation_id:
+                        evaluation_ids.add(evaluation_id)
+            for review_file in sorted(review_root.rglob("review.yaml")):
+                try:
+                    review = load_jsonish(review_file)
+                except DecodexError as exc:
+                    errors.append(str(exc))
+                    continue
+                if not isinstance(review, dict):
+                    continue
+                if review.get("skill_id") != skill_id:
+                    errors.append(f"{review_file}: skill_id does not match {skill_id}")
+                review_evaluation_ids = review.get("evaluation_ids", [])
+                if isinstance(review_evaluation_ids, list):
+                    for evaluation_id in review_evaluation_ids:
+                        if isinstance(evaluation_id, str) and evaluation_id and evaluation_id not in evaluation_ids:
+                            errors.append(f"{review_file}: missing referenced evaluation {evaluation_id}")
+
+        revision_root = skill_dir / "revisions"
+        if revision_root.exists():
+            for revision_file in sorted(revision_root.rglob("revision.yaml")):
+                try:
+                    revision = load_jsonish(revision_file)
+                except DecodexError as exc:
+                    errors.append(str(exc))
+                    continue
+                if not isinstance(revision, dict):
+                    continue
+                if revision.get("skill_id") != skill_id:
+                    errors.append(f"{revision_file}: skill_id does not match {skill_id}")
+                from_version = revision.get("from_version")
+                to_version = revision.get("to_version")
+                if isinstance(from_version, str) and from_version:
+                    if not (skill_dir / "versions" / from_version / "skill.yaml").exists():
+                        errors.append(f"{revision_file}: missing from_version snapshot {from_version}")
+                if isinstance(to_version, str) and to_version:
+                    if not (skill_dir / "versions" / to_version / "skill.yaml").exists():
+                        errors.append(f"{revision_file}: missing to_version snapshot {to_version}")
+
+    return errors
+
+
 def _project_ids(root: Path) -> set[str]:
     ids: set[str] = set()
     for project_file in _discover_project_files(root):
@@ -1384,7 +1966,7 @@ def init_workspace(root: Path, *, force: bool = False) -> list[Path]:
     json_templates = {
         "decodex.yaml": {
             "name": "Decodex",
-            "version": "0.1.3",
+            "version": "0.1.4",
             "status": "mvp",
             "runtime": {"python_candidates": ["python", "python3"]},
             "layers": {
@@ -1552,13 +2134,6 @@ def init_project(root: Path, project: str, *, source: Path | None = None, force:
     if validate_errors:
         raise DecodexError("project initialization produced an invalid repository:\n" + "\n".join(validate_errors))
     return created
-    lines = [f"# {title}", ""]
-    for skill in skills:
-        lines.append(f"- {skill}")
-    if len(lines) == 2:
-        lines.append("- None")
-    lines.append("")
-    return "\n".join(lines)
 
 
 def _list_skill_ids(base: Path) -> list[str]:
