@@ -1,0 +1,15 @@
+{
+  "evaluation_id": "2026-06-21-v0.1.6-supervised-project-validation-eval",
+  "review_id": "2026-06-21-v0.1.6-supervised-project-validation-review",
+  "skill_id": "context-compliance-review",
+  "skill_version": "0.1.0",
+  "project": "decodex",
+  "result": "validate_project",
+  "confidence": "medium",
+  "scope": "project",
+  "cross_project_reuse": true,
+  "notes": [
+    "Three real evaluations support a cautious project validation.",
+    "The evidence is strong enough for project scope, but not for global promotion."
+  ]
+}

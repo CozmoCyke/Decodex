@@ -117,9 +117,9 @@ class SkillLifecycleTests(unittest.TestCase):
         provenance = load_jsonish(context_dir / "provenance.json")
         project_skills = provenance["project_skills"]
         self.assertTrue(any(skill["version"] == "0.1.0" for skill in project_skills))
-        self.assertTrue(any(skill["status"] == "candidate" for skill in project_skills))
-        self.assertTrue(any(skill["confidence"] == "low" for skill in project_skills))
-        self.assertTrue(any(skill["recommendation"] == "continue_evaluation" for skill in project_skills))
+        self.assertTrue(any(skill["status"] == "validated" for skill in project_skills))
+        self.assertTrue(any(skill["confidence"] == "medium" for skill in project_skills))
+        self.assertTrue(any(skill["recommendation"] == "validate_project" for skill in project_skills))
         self.assertTrue(any(skill.get("latest_review") for skill in project_skills))
 
     def _case_session_close_preserves_version(self) -> None:
@@ -149,7 +149,7 @@ class SkillLifecycleTests(unittest.TestCase):
         self.assertTrue((skill_dir / "evaluations" / "2026-06-20-v0.1.4-artifacts" / "evaluation.yaml").exists())
         self.assertTrue((skill_dir / "reviews" / "2026-06-20-v0.1.4-artifacts" / "review.yaml").exists())
         self.assertTrue((skill_dir / "versions" / "0.1.0" / "skill.yaml").exists())
-        self.assertEqual(load_jsonish(skill_dir / "skill.yaml")["recommendation"], "continue_evaluation")
+        self.assertEqual(load_jsonish(skill_dir / "skill.yaml")["recommendation"], "validate_project")
 
     def _case_skill_evaluation_artifact(self) -> None:
         repo = self.make_repo()
@@ -367,7 +367,7 @@ class SkillLifecycleTests(unittest.TestCase):
     def _case_runtime_resolution(self) -> None:
         repo = self.make_repo()
         self.assertTrue((repo / "decodex.yaml").exists())
-        self.assertEqual(load_jsonish(repo / "decodex.yaml")["version"], "0.1.5")
+        self.assertEqual(load_jsonish(repo / "decodex.yaml")["version"], "0.1.6")
 
 
 if __name__ == "__main__":

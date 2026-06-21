@@ -1,0 +1,146 @@
+{
+  "applied_project_skills": [
+    {
+      "application": {
+        "id": "context-compliance-review--decodex--decodex--2026-06-21-v0.1.6-supervised-project-validation--0.1.0",
+        "path": "projects/decodex/sessions/2026-06-21-v0.1.6-supervised-project-validation/skill-applications/context-compliance-review--decodex--decodex--2026-06-21-v0.1.6-supervised-project-validation--0.1.0/application.yaml",
+        "report": "projects/decodex/sessions/2026-06-21-v0.1.6-supervised-project-validation/skill-applications/context-compliance-review--decodex--decodex--2026-06-21-v0.1.6-supervised-project-validation--0.1.0/application.md",
+        "source_skill_path": "projects/decodex/skills/context-compliance-review/skill.yaml",
+        "status": "applied"
+      },
+      "confidence": "medium",
+      "id": "context-compliance-review",
+      "latest_evaluation": {
+        "id": "2026-06-21-v0.1.6-supervised-project-validation-eval",
+        "path": "projects/decodex/skills/context-compliance-review/evaluations/2026-06-21-v0.1.6-supervised-project-validation-eval/evaluation.yaml",
+        "recommendation": "validate_project"
+      },
+      "latest_review": {
+        "approved_by": "Codex",
+        "id": "2026-06-21-v0.1.6-supervised-project-validation-review",
+        "path": "projects/decodex/skills/context-compliance-review/reviews/2026-06-21-v0.1.6-supervised-project-validation-review/review.yaml",
+        "recommendation": "validate_project"
+      },
+      "origin_project": "decodex",
+      "recommendation": "validate_project",
+      "session": "2026-06-21-v0.1.6-supervised-project-validation",
+      "source_skill_path": "projects/decodex/skills/context-compliance-review/skill.yaml",
+      "status": "validated",
+      "target_project": "decodex",
+      "title": "Context Compliance Review",
+      "version": "0.1.0"
+    }
+  ],
+  "architecture": {
+    "layers": [
+      "inbox",
+      "projects",
+      "global"
+    ],
+    "summary": "Three-layer memory: inbox, project, global."
+  },
+  "decisions": [],
+  "generated_at": "2026-06-21T00:00:00+00:00",
+  "generated_hashes": {},
+  "inherited_skills": [
+    {
+      "confidence": "high",
+      "evidence": [],
+      "id": "safe-runtime-modification",
+      "latest_evaluation": null,
+      "latest_review": null,
+      "lifecycle": {},
+      "origin_project": "unknown",
+      "recommendation": "unknown",
+      "scope": "global",
+      "source_path": "global/skills/safe-runtime-modification/skill.yaml",
+      "status": "validated",
+      "title": "Safe Runtime Modification",
+      "version": "0.1.0"
+    }
+  ],
+  "project": "decodex",
+  "project_skills": [
+    {
+      "confidence": "medium",
+      "evidence": [
+        "projects/decodex/sessions/2026-06-21-v0.1.6-supervised-project-validation/compliance-report.md",
+        "projects/decodex/sessions/2026-06-21-v0.1.6-supervised-project-validation/feedback.yaml"
+      ],
+      "id": "context-compliance-review",
+      "latest_evaluation": {
+        "id": "2026-06-21-v0.1.6-supervised-project-validation-eval",
+        "path": "projects/decodex/skills/context-compliance-review/evaluations/2026-06-21-v0.1.6-supervised-project-validation-eval/evaluation.yaml",
+        "recommendation": "validate_project"
+      },
+      "latest_review": {
+        "approved_by": "Codex",
+        "id": "2026-06-21-v0.1.6-supervised-project-validation-review",
+        "path": "projects/decodex/skills/context-compliance-review/reviews/2026-06-21-v0.1.6-supervised-project-validation-review/review.yaml",
+        "recommendation": "validate_project"
+      },
+      "lifecycle": {
+        "approved_review": "2026-06-21-v0.1.6-supervised-project-validation-review",
+        "approval": "2026-06-21-v0.1.6-supervised-project-validation-approval",
+        "human_approval": {
+          "date": "2026-06-21",
+          "decision": "approve_project_validation",
+          "reviewer": "Codex"
+        },
+        "latest_recommendation": "validate_project",
+        "state": "validated"
+      },
+      "origin_project": "decodex",
+      "recommendation": "validate_project",
+      "scope": "project",
+      "source_path": "projects/decodex/skills/context-compliance-review/skill.yaml",
+      "status": "validated",
+      "title": "Context Compliance Review",
+      "version": "0.1.0"
+    }
+  ],
+  "security_rules": [
+    {
+      "id": "deny-outside-workspace",
+      "scope": "global",
+      "source": "decodex_core.py",
+      "statement": "Refuse writes outside the workspace root."
+    },
+    {
+      "id": "validate-before-audit",
+      "scope": "global",
+      "source": "README.md",
+      "statement": "Run validate before audit."
+    },
+    {
+      "id": "no-auto-global-promotion",
+      "scope": "project",
+      "source": "projects/decodex/sessions/2026-06-21-v0.1.6-supervised-project-validation/session.yaml",
+      "statement": "Never promote global skills automatically without human approval evidence."
+    }
+  ],
+  "self_application_policy": [
+    "Decodex prepares the context, Codex executes the change, Decodex measures the result, a human validates the promotion."
+  ],
+  "source_files": [
+    {
+      "path": "README.md",
+      "sha256": "43F1868C97B0733E141BCE36EFC29AFED35CCDB370D1C8AB212013BBEBFACF87"
+    },
+    {
+      "path": "decodex.yaml",
+      "sha256": "0D7A088D4DFB3E891C3A93332D303EA1A5F8EEC8FAC6C3DAE09B306ECE8C7393"
+    },
+    {
+      "path": "projects/decodex/project.yaml",
+      "sha256": "DC881A997030C22840519C11A341851B3E0ABF785064C027D40CBCF826CE36A0"
+    },
+    {
+      "path": "projects/decodex/skills/context-compliance-review/skill.yaml",
+      "sha256": "7EF290B33467C833B8B707BA34F327760A7CFD133120393A42726BE3E0250B01"
+    }
+  ],
+  "project_context": {
+    "note": "This skill is validated for the decodex project, but it is not global."
+  }
+}

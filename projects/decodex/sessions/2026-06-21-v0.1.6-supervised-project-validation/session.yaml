@@ -1,0 +1,39 @@
+{
+  "id": "2026-06-21-v0.1.6-supervised-project-validation",
+  "project": "decodex",
+  "date": "2026-06-21",
+  "goal": "Record the third supervised project-validation pass for context-compliance-review.",
+  "validation": {
+    "commands": [
+      "python -m unittest discover -s tests -v",
+      "python tools\\decodex.py validate --root .",
+      "python tools\\decodex.py audit --root .",
+      "python tools\\decodex.py context-check --project decodex --context-root ."
+    ],
+    "results": [
+      "recorded"
+    ]
+  },
+  "lessons": {
+    "project": [
+      "Decodex can validate a project-scoped skill without promoting it globally.",
+      "Human approval and append-only transition history preserve the boundary between project and global scope."
+    ],
+    "global_candidates": [
+      "validate before audit",
+      "refuse writes outside workspace",
+      "context-compliance-review"
+    ]
+  },
+  "artifacts": [
+    ".codex/",
+    "projects/decodex/skills/context-compliance-review/evaluations/source-eval/evaluation.yaml",
+    "projects/pac-hunt-2/skills/context-compliance-review/evaluations/target-eval/evaluation.yaml",
+    "projects/decodex/skills/context-compliance-review/evaluations/2026-06-21-v0.1.6-supervised-project-validation-eval/evaluation.yaml",
+    "projects/decodex/skills/context-compliance-review/reviews/2026-06-21-v0.1.6-supervised-project-validation-review/review.yaml",
+    "projects/decodex/skills/context-compliance-review/approvals/2026-06-21-v0.1.6-supervised-project-validation-approval/approval.yaml",
+    "projects/decodex/registry/skill-transition-history.jsonl",
+    "compliance-report.md",
+    "feedback.yaml"
+  ]
+}

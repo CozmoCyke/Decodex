@@ -1,0 +1,23 @@
+{
+  "id": "2026-06-21-v0.1.6-supervised-project-validation-eval",
+  "skill_id": "context-compliance-review",
+  "skill_version": "0.1.0",
+  "project": "decodex",
+  "session": "2026-06-21-v0.1.6-supervised-project-validation",
+  "status": "success",
+  "runs": 3,
+  "successful_runs": 3,
+  "confidence": "medium",
+  "recommendation": "validate_project",
+  "scope": "project",
+  "evidence": [
+    "projects/decodex/sessions/2026-06-21-v0.1.6-supervised-project-validation/compliance-report.md",
+    "projects/decodex/sessions/2026-06-21-v0.1.6-supervised-project-validation/feedback.yaml",
+    "projects/decodex/skills/context-compliance-review/reviews/2026-06-21-v0.1.6-supervised-project-validation-review/review.yaml"
+  ],
+  "contradictions": [],
+  "notes": [
+    "Third real Decodex use of the skill during development.",
+    "Evidence supports project validation, not global promotion."
+  ]
+}

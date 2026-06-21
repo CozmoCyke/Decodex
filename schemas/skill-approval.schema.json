@@ -1,0 +1,40 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Decodex Skill Approval",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "id",
+    "skill_id",
+    "skill_version",
+    "review_id",
+    "decision",
+    "reviewer",
+    "date",
+    "rationale",
+    "scope",
+    "target_status",
+    "evidence"
+  ],
+  "properties": {
+    "id": { "type": "string" },
+    "skill_id": { "type": "string" },
+    "skill_version": { "type": "string" },
+    "review_id": { "type": "string" },
+    "decision": {
+      "type": "string",
+      "enum": [
+        "approve_project_validation",
+        "reject",
+        "request_revision",
+        "defer"
+      ]
+    },
+    "reviewer": { "type": "string" },
+    "date": { "type": "string" },
+    "rationale": { "type": "string" },
+    "scope": { "type": "string" },
+    "target_status": { "type": "string" },
+    "evidence": { "type": "array" }
+  }
+}

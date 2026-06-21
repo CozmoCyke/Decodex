@@ -19,11 +19,13 @@ from decodex_core import (
     init_workspace,
     promote_skill,
     skill_apply,
+    skill_approve,
     context_check,
     skill_diff,
     skill_evaluate,
     skill_revise,
     skill_review,
+    skill_transition,
     session_close,
     resolve_python_interpreter,
     search_repository,
@@ -165,6 +167,23 @@ def build_parser() -> argparse.ArgumentParser:
     skill_apply_parser.add_argument("--to-project", required=True)
     skill_apply_parser.add_argument("--session", required=True)
     skill_apply_parser.set_defaults(command="skill-apply")
+
+    skill_approve_parser = subparsers.add_parser("skill-approve")
+    skill_approve_parser.add_argument("--root", default=default_root(), type=Path)
+    skill_approve_parser.add_argument("--project", required=True)
+    skill_approve_parser.add_argument("--skill", required=True)
+    skill_approve_parser.add_argument("--review", required=True)
+    skill_approve_parser.add_argument("--decision", required=True, choices=["approve_project_validation", "reject", "request_revision", "defer"])
+    skill_approve_parser.add_argument("--reviewer", required=True)
+    skill_approve_parser.add_argument("--rationale", required=True)
+    skill_approve_parser.set_defaults(command="skill-approve")
+
+    skill_transition_parser = subparsers.add_parser("skill-transition")
+    skill_transition_parser.add_argument("--root", default=default_root(), type=Path)
+    skill_transition_parser.add_argument("--project", required=True)
+    skill_transition_parser.add_argument("--skill", required=True)
+    skill_transition_parser.add_argument("--approval", required=True)
+    skill_transition_parser.set_defaults(command="skill-transition")
 
     return parser
 
@@ -342,6 +361,31 @@ def main(argv: list[str] | None = None) -> int:
             )
             print(application_path)
             print(report_path)
+            return 0
+
+        if args.command == "skill-approve":
+            approval_path, approval_report = skill_approve(
+                root,
+                project=args.project,
+                skill_id=args.skill,
+                review_id=args.review,
+                decision=args.decision,
+                reviewer=args.reviewer,
+                rationale=args.rationale,
+            )
+            print(approval_path)
+            print(approval_report)
+            return 0
+
+        if args.command == "skill-transition":
+            skill_file, history_file = skill_transition(
+                root,
+                project=args.project,
+                skill_id=args.skill,
+                approval_id=args.approval,
+            )
+            print(skill_file)
+            print(history_file)
             return 0
 
         raise DecodexError(f"unknown command: {args.command}")

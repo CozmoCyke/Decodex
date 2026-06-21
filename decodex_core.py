@@ -266,6 +266,12 @@ def validate_repository(root: Path) -> list[str]:
         except DecodexError as exc:
             errors.append(str(exc))
 
+    for approval_path in _discover_skill_approval_files(root):
+        try:
+            errors.extend(validate_json_schema_file(approval_path, root / "schemas" / "skill-approval.schema.json"))
+        except DecodexError as exc:
+            errors.append(str(exc))
+
     return errors
 
 
@@ -279,6 +285,8 @@ def audit_repository(root: Path) -> list[str]:
     errors.extend(_audit_promotions(root))
     errors.extend(_audit_skill_lifecycle(root))
     errors.extend(_audit_skill_applications(root))
+    errors.extend(_audit_skill_approvals(root))
+    errors.extend(_audit_skill_transitions(root))
     errors.extend(_audit_absolute_paths(root))
     errors.extend(_audit_tracked_generated_files(root))
     errors.extend(_audit_evidence_references(root))
@@ -355,6 +363,21 @@ def _discover_skill_application_files(root: Path) -> list[Path]:
         if path.is_file():
             files.append(path)
     return sorted({path.resolve() for path in files})
+
+
+def _discover_skill_approval_files(root: Path) -> list[Path]:
+    files: list[Path] = []
+    for base in [root / "global" / "skills", root / "projects"]:
+        if not base.exists():
+            continue
+        for path in base.rglob("approvals/*/approval.yaml"):
+            if path.is_file():
+                files.append(path)
+    return sorted({path.resolve() for path in files})
+
+
+def _discover_skill_transition_history(root: Path) -> Path:
+    return root / "registry" / "skill-transition-history.jsonl"
 
 
 def search_repository(root: Path, query: str) -> list[Path]:
@@ -498,45 +521,46 @@ def skill_apply(
         raise DecodexError(f"missing skill version: {source_skill_file}")
 
     application_id = _application_id(skill_id, from_project, to_project, session, source_version)
-    application_dir = ensure_within_root(
-        root,
-        target_project_dir / "sessions" / session / "skill-applications" / application_id,
-    )
-    target_skill_dir = target_project_dir / "skills" / skill_id
+    same_project = from_project == to_project
+    application_dir = ensure_within_root(root, target_project_dir / "sessions" / session / "skill-applications" / application_id)
+    target_skill_dir = source_skill_dir if same_project else target_project_dir / "skills" / skill_id
     if application_dir.exists():
         raise DecodexError(f"application already exists: {application_dir}")
-    if target_skill_dir.exists():
+    if not same_project and target_skill_dir.exists():
         raise DecodexError(f"target skill already exists: {target_skill_dir}")
     application_dir.mkdir(parents=True, exist_ok=False)
-    target_skill_dir.mkdir(parents=True, exist_ok=False)
     source_hash = _sha256_file(source_skill_file)
 
-    target_skill = dict(source_skill)
-    target_skill["scope"] = "project"
-    target_skill["origin_project"] = source_skill.get("origin_project", from_project)
-    origin_projects = target_skill.get("origin_projects")
-    if isinstance(origin_projects, list):
-        deduped_origin_projects = [value for value in origin_projects if isinstance(value, str) and value]
-    else:
-        deduped_origin_projects = [target_skill["origin_project"]] if isinstance(target_skill.get("origin_project"), str) else []
-    if from_project not in deduped_origin_projects:
-        deduped_origin_projects.append(from_project)
-    target_skill["origin_projects"] = deduped_origin_projects
-    target_skill["application"] = {
-        "id": application_id,
-        "source_project": from_project,
-        "target_project": to_project,
-        "session": session,
-        "source_hash": source_hash,
-        "source_skill_path": source_skill_file.relative_to(root).as_posix(),
-    }
-    dump_jsonish(target_skill_dir / "skill.yaml", target_skill)
-    source_skill_markdown = source_skill_dir / "SKILL.md"
-    if source_skill_markdown.exists():
-        shutil.copy2(source_skill_markdown, target_skill_dir / "SKILL.md")
-    snapshot_dir = _skill_version_snapshot_dir(target_skill_dir, source_version)
-    snapshot_dir.mkdir(parents=True, exist_ok=True)
-    dump_jsonish(snapshot_dir / "skill.yaml", target_skill)
+    target_skill_path = source_skill_file.relative_to(root).as_posix()
+    if not same_project:
+        target_skill = dict(source_skill)
+        target_skill["scope"] = "project"
+        target_skill["origin_project"] = source_skill.get("origin_project", from_project)
+        origin_projects = target_skill.get("origin_projects")
+        if isinstance(origin_projects, list):
+            deduped_origin_projects = [value for value in origin_projects if isinstance(value, str) and value]
+        else:
+            deduped_origin_projects = [target_skill["origin_project"]] if isinstance(target_skill.get("origin_project"), str) else []
+        if from_project not in deduped_origin_projects:
+            deduped_origin_projects.append(from_project)
+        target_skill["origin_projects"] = deduped_origin_projects
+        target_skill["application"] = {
+            "id": application_id,
+            "source_project": from_project,
+            "target_project": to_project,
+            "session": session,
+            "source_hash": source_hash,
+            "source_skill_path": source_skill_file.relative_to(root).as_posix(),
+        }
+        target_skill_dir.mkdir(parents=True, exist_ok=False)
+        dump_jsonish(target_skill_dir / "skill.yaml", target_skill)
+        source_skill_markdown = source_skill_dir / "SKILL.md"
+        if source_skill_markdown.exists():
+            shutil.copy2(source_skill_markdown, target_skill_dir / "SKILL.md")
+        snapshot_dir = _skill_version_snapshot_dir(target_skill_dir, source_version)
+        snapshot_dir.mkdir(parents=True, exist_ok=True)
+        dump_jsonish(snapshot_dir / "skill.yaml", target_skill)
+        target_skill_path = (target_skill_dir / "skill.yaml").relative_to(root).as_posix()
     latest_review, latest_review_path = _latest_skill_artifact(source_skill_dir, "reviews")
     latest_evaluation, latest_evaluation_path = _latest_skill_artifact(source_skill_dir, "evaluations")
     application = {
@@ -550,6 +574,7 @@ def skill_apply(
         "status": "applied",
         "source_skill_path": source_skill_file.relative_to(root).as_posix(),
         "source_hash": source_hash,
+        "target_skill_path": target_skill_path,
         "source_confidence": source_skill.get("confidence", "unknown"),
         "source_recommendation": source_skill.get("recommendation", "unknown"),
         "source_status": source_skill.get("status", "unknown"),
@@ -561,6 +586,7 @@ def skill_apply(
         "latest_evaluation_id": latest_evaluation.get("id") if isinstance(latest_evaluation, dict) else None,
         "latest_evaluation_path": latest_evaluation_path.relative_to(root).as_posix() if latest_evaluation_path else None,
         "source_origin": source_skill.get("origin_project", from_project),
+        "same_project": same_project,
     }
     dump_jsonish(application_dir / "application.yaml", application)
 
@@ -575,6 +601,7 @@ def skill_apply(
         f"- session: {session}",
         f"- status: applied",
         f"- source_hash: {source_hash}",
+        f"- target_skill: {target_skill_path}",
         f"- target_context: {application['target_context_path']}",
         "",
         "## Source Skill",
@@ -696,11 +723,25 @@ def _latest_skill_artifact_id(skill_dir: Path, folder: str) -> str | None:
 
 
 def _latest_skill_approval(skill_dir: Path) -> str | None:
-    review, _ = _latest_skill_artifact(skill_dir, "reviews")
-    if not review:
+    approval, _ = _latest_skill_artifact(skill_dir, "approvals")
+    if not approval:
         return None
-    approved_by = review.get("approved_by")
+    approved_by = approval.get("reviewer")
     return approved_by if isinstance(approved_by, str) and approved_by else None
+
+
+def _latest_skill_approval_record(skill_dir: Path) -> tuple[dict[str, Any] | None, Path | None]:
+    return _latest_skill_artifact(skill_dir, "approvals")
+
+
+def _skill_confidence_value(value: Any) -> str:
+    if isinstance(value, str) and value:
+        return value
+    if isinstance(value, dict):
+        level = value.get("level")
+        if isinstance(level, str) and level:
+            return level
+    return "unknown"
 
 
 def _resolve_skill_snapshot_file(skill_dir: Path, version: str) -> Path:
@@ -753,8 +794,12 @@ def _list_skill_records(root: Path, base: Path) -> list[dict[str, Any]]:
         if isinstance(skill_id, str):
             review, review_path = _latest_skill_artifact(skill_file.parent, "reviews")
             evaluation, evaluation_path = _latest_skill_artifact(skill_file.parent, "evaluations")
+            approval, approval_path = _latest_skill_approval_record(skill_file.parent)
             lifecycle = skill.get("lifecycle", {})
             lifecycle_data = lifecycle if isinstance(lifecycle, dict) else {}
+            confidence_value = _skill_confidence_value(skill.get("confidence"))
+            approval_decision = approval.get("decision") if approval else None
+            human_approval = "approved" if approval_decision == "approve_project_validation" else lifecycle_data.get("human_approval", "none")
             record = {
                 "id": skill_id,
                 "title": skill.get("title", skill_id),
@@ -762,9 +807,12 @@ def _list_skill_records(root: Path, base: Path) -> list[dict[str, Any]]:
                 "status": skill.get("status", "unknown"),
                 "scope": skill.get("scope", "unknown"),
                 "origin_project": skill.get("origin_project") or _infer_origin_project(skill_file),
-                "confidence": skill.get("confidence", "unknown"),
+                "confidence": confidence_value,
                 "evidence": skill.get("evidence", []),
                 "lifecycle": lifecycle_data,
+                "human_approval": human_approval,
+                "approved_by": approval.get("reviewer") if approval else lifecycle_data.get("approved_by"),
+                "approval_id": approval.get("id") if approval else lifecycle_data.get("approval"),
                 "latest_evaluation": {
                     "id": evaluation.get("id"),
                     "recommendation": evaluation.get("recommendation"),
@@ -787,6 +835,15 @@ def _list_skill_records(root: Path, base: Path) -> list[dict[str, Any]]:
                     or "unknown"
                 ),
                 "source_path": skill_file.relative_to(root).as_posix(),
+                "latest_approval": {
+                    "id": approval.get("id"),
+                    "decision": approval.get("decision"),
+                    "review_id": approval.get("review_id"),
+                    "reviewer": approval.get("reviewer"),
+                    "path": approval_path.relative_to(root).as_posix() if approval_path else None,
+                }
+                if approval
+                else None,
             }
             records.append(record)
     return records
@@ -826,7 +883,7 @@ def _list_applied_skill_records(root: Path, project: str) -> list[dict[str, Any]
                 "target_project": target_project if isinstance(target_project, str) else project,
                 "version": skill_version if isinstance(skill_version, str) else source_skill.get("version", "unknown"),
                 "status": source_skill.get("status", application.get("status", "unknown")),
-                "confidence": source_skill.get("confidence", application.get("source_confidence", "unknown")),
+                "confidence": _skill_confidence_value(source_skill.get("confidence")) if source_skill else application.get("source_confidence", "unknown"),
                 "recommendation": source_skill.get("recommendation", application.get("source_recommendation", "unknown")),
                 "application": {
                     "id": application.get("id"),
@@ -835,6 +892,7 @@ def _list_applied_skill_records(root: Path, project: str) -> list[dict[str, Any]
                     "status": application.get("status", "unknown"),
                     "source_hash": application.get("source_hash"),
                     "source_skill_path": application.get("source_skill_path"),
+                    "target_skill_path": application.get("target_skill_path"),
                 },
                 "source_hash": application.get("source_hash"),
                 "source_skill_path": application.get("source_skill_path"),
@@ -866,9 +924,12 @@ def _build_context_bundle(root: Path, project: str) -> dict[str, Any]:
     decisions = _list_decision_records(root, project)
     source_refs = _collect_context_sources(root, project)
     source_hashes = {ref["path"]: ref["sha256"] for ref in source_refs}
+    project_file = load_jsonish(root / "projects" / project / "project.yaml") if (root / "projects" / project / "project.yaml").exists() else {}
+    project_name = project_file.get("name", project) if isinstance(project_file, dict) else project
 
     return {
         "project": project,
+        "project_name": project_name,
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "architecture": {
             "summary": "Three-layer memory: inbox, project, global.",
@@ -920,6 +981,7 @@ def _render_context_files(bundle: dict[str, Any]) -> dict[str, str]:
     inherited_skills = bundle["inherited_skills"]
     decisions = bundle["decisions"]
     security_rules = bundle["security_rules"]
+    project_name = bundle.get("project_name", project)
 
     agents = [
         "# AGENTS",
@@ -942,6 +1004,7 @@ def _render_context_files(bundle: dict[str, Any]) -> dict[str, str]:
         "# Project Context",
         "",
         f"- Project: {project}",
+        f"- Project Name: {project_name}",
         "",
         "## Architecture",
         "- inbox stores raw evidence",
@@ -971,10 +1034,15 @@ def _render_context_files(bundle: dict[str, Any]) -> dict[str, str]:
         for skill in project_skills:
             latest_review = skill.get("latest_review") or {}
             latest_evaluation = skill.get("latest_evaluation") or {}
+            latest_approval = skill.get("latest_approval") or {}
+            approval_id = skill.get("approval_id") or latest_approval.get("id", "none")
+            approved_by = skill.get("approved_by") or latest_approval.get("reviewer", "none")
+            human_approval = skill.get("human_approval", "none")
             project_context.append(
                 f"- {skill['id']} | {skill.get('title', skill['id'])} | version={skill.get('version', 'unknown')} | "
                 f"status={skill.get('status', 'unknown')} | origin={skill.get('origin_project', 'unknown')} | "
                 f"confidence={skill.get('confidence', 'unknown')} | recommendation={skill.get('recommendation', 'unknown')} | "
+                f"human_approval={human_approval} | approved_by={approved_by} | approval_id={approval_id} | "
                 f"review={latest_review.get('id', 'none')} | evaluation={latest_evaluation.get('id', 'none')}"
             )
     else:
@@ -994,6 +1062,17 @@ def _render_context_files(bundle: dict[str, Any]) -> dict[str, str]:
     else:
         project_context.append("- None")
     project_context.append("")
+    validated_project_skills = [
+        skill for skill in project_skills if skill.get("status") == "validated" and skill.get("scope") == "project"
+    ]
+    if validated_project_skills:
+        project_context.extend(
+            [
+                "## Validation Note",
+                "- This skill is validated for the project Decodex, but it is not yet global.",
+                "",
+            ]
+        )
 
     inherited_lines = [
         "# Inherited Skills",
@@ -1003,11 +1082,13 @@ def _render_context_files(bundle: dict[str, Any]) -> dict[str, str]:
         for skill in inherited_skills:
             evidence = ", ".join(skill.get("evidence", [])) or "none"
             latest_review = skill.get("latest_review") or {}
+            latest_approval = skill.get("latest_approval") or {}
             inherited_lines.append(
                 f"- {skill['id']} | version={skill.get('version', 'unknown')} | status={skill.get('status', 'unknown')} | "
                 f"scope={skill.get('scope', 'global')} | origin_project={skill.get('origin_project', 'unknown')} | "
                 f"confidence={skill.get('confidence', 'unknown')} | recommendation={skill.get('recommendation', 'unknown')} | "
-                f"review={latest_review.get('id', 'none')} | evidence={evidence}"
+                f"human_approval={skill.get('human_approval', 'none')} | approved_by={skill.get('approved_by', latest_approval.get('reviewer', 'none'))} | "
+                f"approval_id={skill.get('approval_id', latest_approval.get('id', 'none'))} | review={latest_review.get('id', 'none')} | evidence={evidence}"
             )
     else:
         inherited_lines.append("- None")
@@ -1059,8 +1140,10 @@ def _collect_context_sources(root: Path, project: str) -> list[dict[str, Any]]:
     source_paths.extend(_discover_skill_artifact_files(root, "evaluations"))
     source_paths.extend(_discover_skill_artifact_files(root, "reviews"))
     source_paths.extend(_discover_skill_artifact_files(root, "revisions"))
+    source_paths.extend(_discover_skill_approval_files(root))
     application_files = _discover_skill_application_files(root)
     source_paths.extend(application_files)
+    source_paths.append(_discover_skill_transition_history(root))
     for application_file in application_files:
         try:
             application = load_jsonish(application_file)
@@ -1685,12 +1768,17 @@ def _render_skill_review(review: dict[str, Any]) -> str:
         f"- id: {review['id']}",
         f"- skill_id: {review['skill_id']}",
         f"- skill_version: {review['skill_version']}",
+        f"- status: {review.get('status', 'unknown')}",
+        f"- scope: {review.get('scope', 'unknown')}",
         f"- recommendation: {review['recommendation']}",
         f"- approved_by: {review.get('approved_by') or 'none'}",
+        f"- valid_runs: {review.get('valid_runs', 0)}",
         f"- projects_tested: {', '.join(review.get('projects_tested', [])) or 'none'}",
         f"- independent_projects: {review.get('independent_projects', 0)}",
         f"- applications_considered: {review.get('applications_considered', 0)}",
         f"- cross_project_reuse: {review.get('cross_project_reuse', False)}",
+        f"- unresolved_contradictions: {review.get('unresolved_contradictions', 0)}",
+        f"- safety_failures: {review.get('safety_failures', 0)}",
         "",
         "## Evaluation IDs",
     ]
@@ -1708,6 +1796,53 @@ def _render_skill_review(review: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def _render_skill_approval(approval: dict[str, Any]) -> str:
+    lines = [
+        "# Skill Approval",
+        "",
+        f"- id: {approval['id']}",
+        f"- skill_id: {approval['skill_id']}",
+        f"- skill_version: {approval['skill_version']}",
+        f"- review_id: {approval['review_id']}",
+        f"- decision: {approval['decision']}",
+        f"- reviewer: {approval['reviewer']}",
+        f"- date: {approval['date']}",
+        f"- scope: {approval['scope']}",
+        f"- target_status: {approval['target_status']}",
+        "",
+        "## Evidence",
+    ]
+    for evidence in approval.get("evidence", []):
+        lines.append(f"- {evidence}")
+    lines.extend(
+        [
+            "",
+            "## Rationale",
+            f"- {approval.get('rationale') or 'none'}",
+        ]
+    )
+    return "\n".join(lines)
+
+
+def _render_skill_transition(event: dict[str, Any]) -> str:
+    lines = [
+        "# Skill Transition",
+        "",
+        f"- timestamp: {event['timestamp']}",
+        f"- skill_id: {event['skill_id']}",
+        f"- skill_version: {event['skill_version']}",
+        f"- project: {event['project']}",
+        f"- from_status: {event['from_status']}",
+        f"- to_status: {event['to_status']}",
+        f"- scope: {event['scope']}",
+        f"- review_id: {event['review_id']}",
+        f"- approval_id: {event['approval_id']}",
+        f"- reviewer: {event['reviewer']}",
+        "",
+    ]
+    return "\n".join(lines)
+
+
 def _find_skill_evaluation_file(root: Path, skill_id: str, evaluation_id: str) -> Path:
     for evaluation_file in _discover_skill_artifact_files(root, "evaluations"):
         if evaluation_file.parent.name != evaluation_id:
@@ -1719,6 +1854,42 @@ def _find_skill_evaluation_file(root: Path, skill_id: str, evaluation_id: str) -
         if isinstance(evaluation, dict) and evaluation.get("skill_id") == skill_id:
             return evaluation_file
     return root / "__missing__" / skill_id / "evaluations" / evaluation_id / "evaluation.yaml"
+
+
+def _find_skill_review_file(root: Path, skill_id: str, review_id: str) -> Path:
+    for review_file in _discover_skill_artifact_files(root, "reviews"):
+        if review_file.parent.name != review_id:
+            continue
+        try:
+            review = load_jsonish(review_file)
+        except DecodexError:
+            continue
+        if isinstance(review, dict) and review.get("skill_id") == skill_id:
+            return review_file
+    return root / "__missing__" / skill_id / "reviews" / review_id / "review.yaml"
+
+
+def _find_skill_approval_file(root: Path, skill_id: str, approval_id: str) -> Path:
+    for approval_file in _discover_skill_approval_files(root):
+        if approval_file.parent.name != approval_id:
+            continue
+        try:
+            approval = load_jsonish(approval_file)
+        except DecodexError:
+            continue
+        if isinstance(approval, dict) and approval.get("skill_id") == skill_id:
+            return approval_file
+    return root / "__missing__" / skill_id / "approvals" / approval_id / "approval.yaml"
+
+
+def _approval_target_status(decision: str) -> str:
+    mapping = {
+        "approve_project_validation": "validated",
+        "reject": "deprecated",
+        "request_revision": "experimental",
+        "defer": "candidate",
+    }
+    return mapping.get(decision, "candidate")
 
 
 def skill_evaluate(
@@ -1805,6 +1976,7 @@ def skill_review(
                 raise DecodexError(f"missing evaluation for review: {evaluation_file}")
             evaluation = _safe_load_skill(evaluation_file)
             evaluations.append(evaluation)
+    valid_runs = sum(1 for evaluation in evaluations if isinstance(evaluation, dict) and evaluation.get("status") == "passed")
     projects_tested = sorted(
         {
             str(evaluation.get("project"))
@@ -1822,6 +1994,23 @@ def skill_review(
     applications_considered = max(len(evaluations), len(application_ids))
     independent_projects = len(projects_tested)
     cross_project_reuse = independent_projects > 1
+    unresolved_contradictions = sorted(
+        {
+            contradiction
+            for evaluation in evaluations
+            for contradiction in (
+                evaluation.get("contradictions", [])
+                if isinstance(evaluation.get("contradictions", []), list)
+                else []
+            )
+            if isinstance(contradiction, str) and contradiction
+        }
+    )
+    safety_failures = sum(
+        1
+        for evaluation in evaluations
+        if isinstance(evaluation, dict) and evaluation.get("status") != "passed"
+    )
     versions_tested = sorted(
         {
             str(evaluation.get("skill_version"))
@@ -1856,24 +2045,238 @@ def skill_review(
         "skill_id": skill_id,
         "skill_version": skill_version,
         "project": project,
+        "status": "candidate",
+        "scope": scope,
         "reviewer": "decodex",
         "evaluation_ids": evaluation_ids or [],
         "recommendation": recommendation,
         "confidence": confidence,
         "evidence": [],
         "notes": notes or [],
+        "valid_runs": valid_runs,
         "projects_tested": projects_tested,
         "independent_projects": independent_projects,
         "applications_considered": applications_considered,
         "cross_project_reuse": cross_project_reuse,
         "divergences": divergences,
         "contradictions": contradictions,
+        "unresolved_contradictions": len(unresolved_contradictions),
+        "safety_failures": safety_failures,
     }
     if approved_by is not None:
         review["approved_by"] = approved_by
     dump_jsonish(review_dir / "review.yaml", review)
     write_template_text(review_dir / "review.md", _render_skill_review(review), force=True)
     return review_dir / "review.yaml"
+
+
+def skill_approve(
+    root: Path,
+    *,
+    project: str,
+    skill_id: str,
+    review_id: str,
+    decision: str,
+    reviewer: str,
+    rationale: str,
+) -> tuple[Path, Path]:
+    skill_dir = _skill_dir(root, skill_id, "project", project=project)
+    skill_file = skill_dir / "skill.yaml"
+    if not skill_file.exists():
+        raise DecodexError(f"skill not found: {skill_file}")
+    skill_data = _safe_load_skill(skill_file)
+    skill_version = skill_data.get("version")
+    if not isinstance(skill_version, str) or not skill_version:
+        raise DecodexError(f"skill version missing: {skill_file}")
+
+    review_file = _find_skill_review_file(root, skill_id, review_id)
+    if not review_file.exists():
+        raise DecodexError(f"review not found: {review_file}")
+    review = _safe_load_skill(review_file)
+    if not isinstance(review, dict):
+        raise DecodexError(f"invalid review artifact: {review_file}")
+    if review.get("project") != project:
+        raise DecodexError(f"review project mismatch: {review_file}")
+    if review.get("skill_version") != skill_version:
+        raise DecodexError(f"review version mismatch: {review_file}")
+
+    if not reviewer.strip():
+        raise DecodexError("reviewer is required")
+    if not rationale.strip():
+        raise DecodexError("rationale is required")
+
+    target_status = _approval_target_status(decision)
+    allowed = {
+        "approve_project_validation": {"recommendation": "validate_project", "confidence": "medium", "status": "candidate"},
+        "reject": {"recommendation": "continue_evaluation", "confidence": "low", "status": "candidate"},
+        "request_revision": {"recommendation": "revise_skill", "confidence": "low", "status": "candidate"},
+        "defer": {"recommendation": "continue_evaluation", "confidence": "low", "status": "candidate"},
+    }
+    expected = allowed.get(decision)
+    if expected is None:
+        raise DecodexError(f"unsupported approval decision: {decision}")
+
+    review_recommendation = review.get("recommendation")
+    review_confidence = review.get("confidence")
+    if decision == "approve_project_validation":
+        if review_recommendation != "validate_project":
+            raise DecodexError("review recommendation is not compatible with project validation")
+        if review_confidence != "medium":
+            raise DecodexError("review confidence is insufficient for project validation")
+        if review.get("valid_runs") != 3:
+            raise DecodexError("project validation requires three valid runs")
+        if review.get("independent_projects") != 2 or review.get("cross_project_reuse") is not True:
+            raise DecodexError("project validation requires evidence from two projects")
+        if review.get("unresolved_contradictions", 0) != 0:
+            raise DecodexError("project validation requires no unresolved contradictions")
+        if review.get("safety_failures", 0) != 0:
+            raise DecodexError("project validation requires no safety failures")
+
+    approval_id = f"approval-{skill_id}-{review_id}"
+    approval_dir = skill_dir / "approvals" / approval_id
+    if approval_dir.exists():
+        raise DecodexError(f"approval already exists: {approval_dir}")
+    approval_dir.mkdir(parents=True, exist_ok=False)
+    evidence: list[str] = [review_file.relative_to(root).as_posix()]
+    for evaluation_id in review.get("evaluation_ids", []):
+        if isinstance(evaluation_id, str) and evaluation_id:
+            evaluation_file = _find_skill_evaluation_file(root, skill_id, evaluation_id)
+            if evaluation_file.exists():
+                evidence.append(evaluation_file.relative_to(root).as_posix())
+
+    approval = {
+        "id": approval_id,
+        "skill_id": skill_id,
+        "skill_version": skill_version,
+        "review_id": review_id,
+        "decision": decision,
+        "reviewer": reviewer,
+        "date": datetime.now(timezone.utc).date().isoformat(),
+        "rationale": rationale,
+        "scope": "project",
+        "target_status": target_status,
+        "evidence": sorted(dict.fromkeys(evidence)),
+        "review_recommendation": review_recommendation,
+        "review_confidence": review_confidence,
+        "valid_runs": review.get("valid_runs", 0),
+        "projects_tested": review.get("projects_tested", []),
+        "independent_projects": review.get("independent_projects", 0),
+        "cross_project_reuse": review.get("cross_project_reuse", False),
+        "unresolved_contradictions": review.get("unresolved_contradictions", 0),
+        "safety_failures": review.get("safety_failures", 0),
+    }
+    dump_jsonish(approval_dir / "approval.yaml", approval)
+    write_template_text(approval_dir / "approval.md", _render_skill_approval(approval), force=True)
+    return approval_dir / "approval.yaml", approval_dir / "approval.md"
+
+
+def skill_transition(
+    root: Path,
+    *,
+    project: str,
+    skill_id: str,
+    approval_id: str,
+) -> tuple[Path, Path]:
+    skill_dir = _skill_dir(root, skill_id, "project", project=project)
+    skill_file = skill_dir / "skill.yaml"
+    if not skill_file.exists():
+        raise DecodexError(f"skill not found: {skill_file}")
+    skill_data = _safe_load_skill(skill_file)
+    skill_version = skill_data.get("version")
+    if not isinstance(skill_version, str) or not skill_version:
+        raise DecodexError(f"skill version missing: {skill_file}")
+    from_status = skill_data.get("status", "unknown")
+    if not isinstance(from_status, str) or not from_status:
+        raise DecodexError(f"skill status missing: {skill_file}")
+
+    approval_file = _find_skill_approval_file(root, skill_id, approval_id)
+    if not approval_file.exists():
+        raise DecodexError(f"approval not found: {approval_file}")
+    approval = _safe_load_skill(approval_file)
+    if not isinstance(approval, dict):
+        raise DecodexError(f"invalid approval artifact: {approval_file}")
+    if approval.get("skill_version") != skill_version:
+        raise DecodexError(f"approval version mismatch: {approval_file}")
+    if approval.get("scope") != "project":
+        raise DecodexError(f"approval scope mismatch: {approval_file}")
+    if approval.get("target_status") not in {"validated", "deprecated", "experimental", "candidate"}:
+        raise DecodexError(f"approval target status is not supported: {approval_file}")
+    target_status = approval["target_status"]
+
+    allowed_transitions = {
+        ("candidate", "experimental"),
+        ("candidate", "validated"),
+        ("candidate", "deprecated"),
+        ("experimental", "validated"),
+        ("experimental", "deprecated"),
+        ("validated", "deprecated"),
+        ("deprecated", "experimental"),
+    }
+    if (from_status, target_status) not in allowed_transitions:
+        raise DecodexError(f"transition {from_status!r} -> {target_status!r} is not allowed")
+    if target_status == from_status:
+        raise DecodexError("transition would not change skill status")
+    if target_status == "validated" and approval.get("decision") != "approve_project_validation":
+        raise DecodexError("validated transition requires a project validation approval")
+
+    review_file = _find_skill_review_file(root, skill_id, approval.get("review_id", ""))
+    if not review_file.exists():
+        raise DecodexError(f"review not found for approval: {review_file}")
+    review = _safe_load_skill(review_file)
+    if not isinstance(review, dict):
+        raise DecodexError(f"invalid review artifact: {review_file}")
+    if review.get("skill_version") != skill_version:
+        raise DecodexError("approval review version mismatch")
+    if review.get("recommendation") != "validate_project" and target_status == "validated":
+        raise DecodexError("validated transition requires validate_project recommendation")
+    if review.get("unresolved_contradictions", 0) != 0:
+        raise DecodexError("validated transition requires zero unresolved contradictions")
+    if review.get("safety_failures", 0) != 0:
+        raise DecodexError("validated transition requires zero safety failures")
+
+    previous_snapshot = _skill_version_snapshot_dir(skill_dir, skill_version)
+    previous_snapshot.mkdir(parents=True, exist_ok=True)
+    if not (previous_snapshot / "skill.yaml").exists():
+        dump_jsonish(previous_snapshot / "skill.yaml", skill_data)
+
+    revised_skill = dict(skill_data)
+    revised_skill["status"] = target_status
+    revised_skill["scope"] = "project"
+    revised_skill["confidence"] = {"level": approval.get("review_confidence", "medium")}
+    lifecycle = revised_skill.get("lifecycle")
+    if not isinstance(lifecycle, dict):
+        lifecycle = {}
+    lifecycle["state"] = target_status
+    lifecycle["latest_recommendation"] = review.get("recommendation", lifecycle.get("latest_recommendation", "validate_project"))
+    lifecycle["human_approval"] = "approved" if target_status == "validated" else lifecycle.get("human_approval", "none")
+    lifecycle["approved_by"] = approval.get("reviewer")
+    lifecycle["approved_review"] = approval.get("review_id")
+    lifecycle["approval"] = approval.get("id")
+    revised_skill["lifecycle"] = lifecycle
+    dump_jsonish(skill_file, revised_skill)
+
+    transition_history = _discover_skill_transition_history(root)
+    transition_history.parent.mkdir(parents=True, exist_ok=True)
+    event = {
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "skill_id": skill_id,
+        "skill_version": skill_version,
+        "project": project,
+        "from_status": from_status,
+        "to_status": target_status,
+        "scope": "project",
+        "review_id": approval.get("review_id"),
+        "approval_id": approval.get("id"),
+        "reviewer": approval.get("reviewer"),
+    }
+    with transition_history.open("a", encoding="utf-8") as fh:
+        fh.write(json.dumps(event, ensure_ascii=True) + "\n")
+    write_template_text(
+        skill_dir / "transition.md",
+        _render_skill_transition(event),
+        force=True,
+    )
+    return skill_file, transition_history
 
 
 def skill_revise(
@@ -2403,6 +2806,7 @@ def _audit_skill_applications(root: Path) -> list[str]:
         session = application.get("session")
         source_skill_path = application.get("source_skill_path")
         source_hash = application.get("source_hash")
+        target_skill_path = application.get("target_skill_path")
         status = application.get("status")
         report_path = application.get("report_path")
 
@@ -2431,6 +2835,10 @@ def _audit_skill_applications(root: Path) -> list[str]:
         if not isinstance(source_hash, str) or not source_hash:
             errors.append(f"{application_file}: missing source_hash")
             continue
+        if not isinstance(target_skill_path, str) or not target_skill_path:
+            errors.append(f"{application_file}: missing target_skill_path")
+        elif not (root / target_skill_path).exists():
+            errors.append(f"{application_file}: missing target skill file {target_skill_path}")
 
         source_skill_file = root / source_skill_path
         if not source_skill_file.exists():
@@ -2447,6 +2855,8 @@ def _audit_skill_applications(root: Path) -> list[str]:
             errors.append(f"{application_file}: source skill scope must remain project scoped")
         if source_project == "global" or target_project == "global":
             errors.append(f"{application_file}: implicit global promotion is not allowed")
+        if source_project == target_project and source_skill_path != target_skill_path:
+            errors.append(f"{application_file}: self-application must point to the active project skill")
 
         expected_session_dir = root / "projects" / str(target_project) / "sessions" / str(session)
         if not application_file.is_relative_to(expected_session_dir):
@@ -2491,6 +2901,200 @@ def _audit_skill_applications(root: Path) -> list[str]:
     return errors
 
 
+def _audit_skill_approvals(root: Path) -> list[str]:
+    errors: list[str] = []
+    seen_ids: dict[str, list[Path]] = {}
+    for approval_file in _discover_skill_approval_files(root):
+        try:
+            approval = load_jsonish(approval_file)
+        except DecodexError as exc:
+            errors.append(str(exc))
+            continue
+        if not isinstance(approval, dict):
+            continue
+
+        approval_id = approval.get("id")
+        skill_id = approval.get("skill_id")
+        skill_version = approval.get("skill_version")
+        review_id = approval.get("review_id")
+        decision = approval.get("decision")
+        reviewer = approval.get("reviewer")
+        rationale = approval.get("rationale")
+        evidence = approval.get("evidence", [])
+        target_status = approval.get("target_status")
+
+        if isinstance(approval_id, str) and approval_id:
+            seen_ids.setdefault(approval_id, []).append(approval_file)
+        else:
+            errors.append(f"{approval_file}: missing approval id")
+        if not isinstance(skill_id, str) or not skill_id:
+            errors.append(f"{approval_file}: missing skill_id")
+            continue
+        if not isinstance(skill_version, str) or not skill_version:
+            errors.append(f"{approval_file}: missing skill_version")
+        if not isinstance(review_id, str) or not review_id:
+            errors.append(f"{approval_file}: missing review_id")
+        if not isinstance(decision, str) or not decision:
+            errors.append(f"{approval_file}: missing decision")
+        if not isinstance(reviewer, str) or not reviewer.strip():
+            errors.append(f"{approval_file}: reviewer is required")
+        if not isinstance(rationale, str) or not rationale.strip():
+            errors.append(f"{approval_file}: rationale is required")
+        if approval.get("scope") != "project":
+            errors.append(f"{approval_file}: approval scope must remain project")
+        expected_target_status = _approval_target_status(decision if isinstance(decision, str) else "")
+        if target_status != expected_target_status:
+            errors.append(f"{approval_file}: target_status mismatch for decision {decision!r}")
+        if not isinstance(evidence, list) or not evidence:
+            errors.append(f"{approval_file}: evidence is required")
+        else:
+            for evidence_path in evidence:
+                if isinstance(evidence_path, str) and evidence_path and not (root / evidence_path).exists():
+                    errors.append(f"{approval_file}: missing evidence file {evidence_path}")
+
+        review_file = _find_skill_review_file(root, skill_id, review_id if isinstance(review_id, str) else "")
+        if not review_file.exists():
+            errors.append(f"{approval_file}: missing review {review_id}")
+            continue
+        review = _safe_load_skill(review_file)
+        if not isinstance(review, dict):
+            errors.append(f"{approval_file}: invalid review artifact")
+            continue
+        if review.get("skill_version") != skill_version:
+            errors.append(f"{approval_file}: approval version mismatch")
+        if review.get("recommendation") != approval.get("review_recommendation"):
+            errors.append(f"{approval_file}: approval review recommendation mismatch")
+        if review.get("decision") == "approve_project_validation" and decision != "approve_project_validation":
+            errors.append(f"{approval_file}: approval decision mismatch")
+        if decision == "approve_project_validation":
+            if review.get("recommendation") != "validate_project":
+                errors.append(f"{approval_file}: recommendation incompatible with project validation")
+            if review.get("confidence") != "medium":
+                errors.append(f"{approval_file}: confidence insufficient for project validation")
+            if review.get("valid_runs") != 3:
+                errors.append(f"{approval_file}: project validation requires three valid runs")
+            if review.get("independent_projects") != 2 or review.get("cross_project_reuse") is not True:
+                errors.append(f"{approval_file}: project validation requires two tested projects")
+            if review.get("unresolved_contradictions", 0) != 0:
+                errors.append(f"{approval_file}: unresolved contradictions remain")
+            if review.get("safety_failures", 0) != 0:
+                errors.append(f"{approval_file}: safety failures remain")
+
+    for approval_id, files in seen_ids.items():
+        if len(files) > 1:
+            errors.append(f"duplicate approval id {approval_id}: " + ", ".join(str(path) for path in files))
+    return errors
+
+
+def _audit_skill_transitions(root: Path) -> list[str]:
+    errors: list[str] = []
+    history_path = _discover_skill_transition_history(root)
+    if not history_path.exists():
+        return errors
+
+    allowed_transitions = {
+        ("candidate", "experimental"),
+        ("candidate", "validated"),
+        ("candidate", "deprecated"),
+        ("experimental", "validated"),
+        ("experimental", "deprecated"),
+        ("validated", "deprecated"),
+        ("deprecated", "experimental"),
+    }
+    latest_event_by_skill: dict[tuple[str, str, str], dict[str, Any]] = {}
+    seen_events: set[tuple[str, str, str, str, str, str, str]] = set()
+    for line_no, line in enumerate(history_path.read_text(encoding="utf-8").splitlines(), start=1):
+        if not line.strip():
+            continue
+        try:
+            event = json.loads(line)
+        except json.JSONDecodeError as exc:
+            errors.append(f"{history_path}:{line_no}: invalid JSON: {exc.msg}")
+            continue
+        if not isinstance(event, dict):
+            errors.append(f"{history_path}:{line_no}: transition event must be an object")
+            continue
+        skill_id = event.get("skill_id")
+        skill_version = event.get("skill_version")
+        project = event.get("project")
+        from_status = event.get("from_status")
+        to_status = event.get("to_status")
+        approval_id = event.get("approval_id")
+        review_id = event.get("review_id")
+        reviewer = event.get("reviewer")
+        scope = event.get("scope")
+        if not all(isinstance(value, str) and value for value in [skill_id, skill_version, project, from_status, to_status, approval_id, review_id, reviewer, scope]):
+            errors.append(f"{history_path}:{line_no}: invalid transition event fields")
+            continue
+        exact_key = (skill_id, skill_version, project, from_status, to_status, approval_id, review_id)
+        if exact_key in seen_events:
+            errors.append(f"{history_path}:{line_no}: duplicate transition event detected")
+        seen_events.add(exact_key)
+        if (from_status, to_status) not in allowed_transitions:
+            errors.append(f"{history_path}:{line_no}: unauthorized transition {from_status!r} -> {to_status!r}")
+        if scope != "project":
+            errors.append(f"{history_path}:{line_no}: scope must remain project")
+        approval_file = _find_skill_approval_file(root, skill_id, approval_id)
+        if not approval_file.exists():
+            errors.append(f"{history_path}:{line_no}: missing approval {approval_id}")
+            continue
+        approval = _safe_load_skill(approval_file)
+        if not isinstance(approval, dict):
+            errors.append(f"{history_path}:{line_no}: invalid approval artifact")
+            continue
+        if approval.get("skill_version") != skill_version:
+            errors.append(f"{history_path}:{line_no}: approval version mismatch")
+        if approval.get("review_id") != review_id:
+            errors.append(f"{history_path}:{line_no}: approval review mismatch")
+        if approval.get("target_status") != to_status:
+            errors.append(f"{history_path}:{line_no}: approval target status mismatch")
+
+        review_file = _find_skill_review_file(root, skill_id, review_id)
+        if not review_file.exists():
+            errors.append(f"{history_path}:{line_no}: missing review {review_id}")
+            continue
+        review = _safe_load_skill(review_file)
+        if not isinstance(review, dict):
+            errors.append(f"{history_path}:{line_no}: invalid review artifact")
+            continue
+        if review.get("skill_version") != skill_version:
+            errors.append(f"{history_path}:{line_no}: review version mismatch")
+        skill_key = (skill_id, skill_version, project)
+        latest_event_by_skill[skill_key] = event
+
+    for (skill_id, skill_version, project), event in latest_event_by_skill.items():
+        skill_file = _skill_dir(root, skill_id, "project", project=project) / "skill.yaml"
+        if not skill_file.exists():
+            errors.append(f"{history_path}: missing skill file {skill_file}")
+            continue
+        skill = _safe_load_skill(skill_file)
+        if not isinstance(skill, dict):
+            errors.append(f"{history_path}: invalid skill artifact")
+            continue
+        if skill.get("status") != event.get("to_status"):
+            errors.append(f"{history_path}: skill status does not match latest transition")
+        if skill.get("scope") != "project":
+            errors.append(f"{history_path}: skill scope must remain project")
+        if event.get("to_status") == "validated":
+            lifecycle = skill.get("lifecycle", {})
+            lifecycle_data = lifecycle if isinstance(lifecycle, dict) else {}
+            human_approval = lifecycle_data.get("human_approval")
+            approval_marker_ok = human_approval == "approved"
+            if isinstance(human_approval, dict):
+                approval_marker_ok = human_approval.get("decision") == "approve_project_validation"
+            if not approval_marker_ok:
+                errors.append(f"{history_path}: validated skill missing human approval marker")
+            if lifecycle_data.get("approved_by") != event.get("reviewer"):
+                errors.append(f"{history_path}: validated skill approved_by mismatch")
+            if lifecycle_data.get("approval") != event.get("approval_id"):
+                errors.append(f"{history_path}: validated skill approval id mismatch")
+            global_skill_file = root / "global" / "skills" / skill_id / "skill.yaml"
+            if global_skill_file.exists():
+                errors.append(f"{history_path}: global validation is not allowed for {skill_id}")
+
+    return errors
+
+
 def _project_ids(root: Path) -> set[str]:
     ids: set[str] = set()
     for project_file in _discover_project_files(root):
@@ -2519,7 +3123,7 @@ def init_workspace(root: Path, *, force: bool = False) -> list[Path]:
     json_templates = {
         "decodex.yaml": {
             "name": "Decodex",
-            "version": "0.1.5",
+            "version": "0.1.6",
             "status": "mvp",
             "runtime": {"python_candidates": ["python", "python3"]},
             "layers": {

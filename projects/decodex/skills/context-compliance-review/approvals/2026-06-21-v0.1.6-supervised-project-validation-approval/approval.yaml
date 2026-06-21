@@ -1,0 +1,19 @@
+{
+  "id": "2026-06-21-v0.1.6-supervised-project-validation-approval",
+  "skill_id": "context-compliance-review",
+  "skill_version": "0.1.0",
+  "review_id": "2026-06-21-v0.1.6-supervised-project-validation-review",
+  "decision": "approve_project_validation",
+  "reviewer": "Codex",
+  "date": "2026-06-21",
+  "rationale": "Three real evaluations support project-scoped validation while preserving the restriction against global promotion.",
+  "scope": "project",
+  "target_status": "validated",
+  "evidence": [
+    "projects/decodex/skills/context-compliance-review/evaluations/source-eval/evaluation.yaml",
+    "projects/pac-hunt-2/skills/context-compliance-review/evaluations/target-eval/evaluation.yaml",
+    "projects/decodex/skills/context-compliance-review/evaluations/2026-06-21-v0.1.6-supervised-project-validation-eval/evaluation.yaml"
+  ],
+  "review_confidence": "medium",
+  "review_recommendation": "validate_project"
+}

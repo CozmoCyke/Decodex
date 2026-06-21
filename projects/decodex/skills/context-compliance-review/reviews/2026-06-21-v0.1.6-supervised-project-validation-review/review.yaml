@@ -1,0 +1,30 @@
+{
+  "id": "2026-06-21-v0.1.6-supervised-project-validation-review",
+  "skill_id": "context-compliance-review",
+  "skill_version": "0.1.0",
+  "project": "decodex",
+  "reviewer": "Codex",
+  "evaluation_ids": [
+    "source-eval",
+    "target-eval",
+    "2026-06-21-v0.1.6-supervised-project-validation-eval"
+  ],
+  "status": "candidate",
+  "scope": "project",
+  "confidence": "medium",
+  "recommendation": "validate_project",
+  "valid_runs": 3,
+  "projects_tested": [
+    "decodex",
+    "pac-hunt-2"
+  ],
+  "independent_projects": 2,
+  "cross_project_reuse": true,
+  "unresolved_contradictions": 0,
+  "safety_failures": 0,
+  "evidence": [
+    "projects/decodex/skills/context-compliance-review/evaluations/source-eval/evaluation.yaml",
+    "projects/pac-hunt-2/skills/context-compliance-review/evaluations/target-eval/evaluation.yaml",
+    "projects/decodex/skills/context-compliance-review/evaluations/2026-06-21-v0.1.6-supervised-project-validation-eval/evaluation.yaml"
+  ]
+}
