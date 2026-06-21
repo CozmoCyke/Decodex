@@ -67,6 +67,12 @@ def ensure_within_root(root: Path, target: Path) -> Path:
     raise DecodexError(f"refusing to write outside workspace: {target}")
 
 
+def _workspace_relative_path(root: Path, path: Path) -> str:
+    canonical_root = root.resolve()
+    canonical_path = ensure_within_root(canonical_root, path)
+    return canonical_path.relative_to(canonical_root).as_posix()
+
+
 def validate_schema(instance: Any, schema: dict[str, Any], path: str = "$") -> list[str]:
     errors: list[str] = []
     expected_type = schema.get("type")
@@ -857,7 +863,7 @@ def _list_skill_records(root: Path, base: Path) -> list[dict[str, Any]]:
                 "latest_evaluation": {
                     "id": evaluation.get("id"),
                     "recommendation": evaluation.get("recommendation"),
-                    "path": evaluation_path.relative_to(root).as_posix() if evaluation_path else None,
+                    "path": _workspace_relative_path(root, evaluation_path) if evaluation_path else None,
                 }
                 if evaluation
                 else None,
@@ -865,7 +871,7 @@ def _list_skill_records(root: Path, base: Path) -> list[dict[str, Any]]:
                     "id": review.get("id"),
                     "recommendation": review.get("recommendation"),
                     "approved_by": review.get("approved_by"),
-                    "path": review_path.relative_to(root).as_posix() if review_path else None,
+                    "path": _workspace_relative_path(root, review_path) if review_path else None,
                 }
                 if review
                 else None,
@@ -875,13 +881,13 @@ def _list_skill_records(root: Path, base: Path) -> list[dict[str, Any]]:
                     or skill.get("recommendation")
                     or "unknown"
                 ),
-                "source_path": skill_file.relative_to(root).as_posix(),
+                "source_path": _workspace_relative_path(root, skill_file),
                 "latest_approval": {
                     "id": approval.get("id"),
                     "decision": approval.get("decision"),
                     "review_id": approval.get("review_id"),
                     "reviewer": approval.get("reviewer"),
-                    "path": approval_path.relative_to(root).as_posix() if approval_path else None,
+                    "path": _workspace_relative_path(root, approval_path) if approval_path else None,
                 }
                 if approval
                 else None,
@@ -928,7 +934,7 @@ def _list_applied_skill_records(root: Path, project: str) -> list[dict[str, Any]
                 "recommendation": source_skill.get("recommendation", application.get("source_recommendation", "unknown")),
                 "application": {
                     "id": application.get("id"),
-                    "path": application_file.relative_to(root).as_posix(),
+                    "path": _workspace_relative_path(root, application_file),
                     "report": application.get("report_path"),
                     "status": application.get("status", "unknown"),
                     "source_hash": application.get("source_hash"),
@@ -942,14 +948,14 @@ def _list_applied_skill_records(root: Path, project: str) -> list[dict[str, Any]
                     "id": latest_review.get("id"),
                     "recommendation": latest_review.get("recommendation"),
                     "approved_by": latest_review.get("approved_by"),
-                    "path": latest_review_path.relative_to(root).as_posix() if latest_review_path else None,
+                    "path": _workspace_relative_path(root, latest_review_path) if latest_review_path else None,
                 }
                 if latest_review
                 else None,
                 "latest_evaluation": {
                     "id": latest_evaluation.get("id"),
                     "recommendation": latest_evaluation.get("recommendation"),
-                    "path": latest_evaluation_path.relative_to(root).as_posix() if latest_evaluation_path else None,
+                    "path": _workspace_relative_path(root, latest_evaluation_path) if latest_evaluation_path else None,
                 }
                 if latest_evaluation
                 else None,
