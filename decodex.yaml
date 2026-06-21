@@ -8,6 +8,10 @@
       "python3"
     ]
   },
+  "hash_policy": {
+    "algorithm": "sha256",
+    "text_normalization": "lf-v1"
+  },
   "layers": {
     "inbox": {
       "purpose": "raw session evidence"

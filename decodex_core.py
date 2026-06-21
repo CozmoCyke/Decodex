@@ -517,8 +517,10 @@ def promote_skill(
         "project": project,
         "source_path": str(source_dir.relative_to(root)),
         "target_path": str(final_target.relative_to(root)),
-        "source_hash": _sha256_file(source_dir / "skill.yaml") if (source_dir / "skill.yaml").exists() else None,
-        "target_hash": _sha256_file(final_target / "skill.yaml") if (final_target / "skill.yaml").exists() else None,
+        "source_hash_algorithm": "sha256",
+        "source_hash_mode": "normalized-text-lf-v1",
+        "source_hash": _sha256_portable_file(source_dir / "skill.yaml") if (source_dir / "skill.yaml").exists() else None,
+        "target_hash": _sha256_portable_file(final_target / "skill.yaml") if (final_target / "skill.yaml").exists() else None,
         "evaluation_ids": _skill_evaluation_ids(source_dir),
         "review_id": _latest_skill_artifact_id(source_dir, "reviews"),
         "approved_by": _latest_skill_approval(source_dir),
@@ -564,7 +566,7 @@ def skill_apply(
     if not same_project and target_skill_dir.exists():
         raise DecodexError(f"target skill already exists: {target_skill_dir}")
     application_dir.mkdir(parents=True, exist_ok=False)
-    source_hash = _sha256_file(source_skill_file)
+    source_hash = _sha256_portable_file(source_skill_file)
 
     target_skill_path = source_skill_file.relative_to(root).as_posix()
     if not same_project:
@@ -585,6 +587,8 @@ def skill_apply(
             "target_project": to_project,
             "session": session,
             "source_hash": source_hash,
+            "source_hash_algorithm": "sha256",
+            "source_hash_mode": "normalized-text-lf-v1",
             "source_skill_path": source_skill_file.relative_to(root).as_posix(),
         }
         target_skill_dir.mkdir(parents=True, exist_ok=False)
@@ -609,6 +613,8 @@ def skill_apply(
         "status": "applied",
         "source_skill_path": source_skill_file.relative_to(root).as_posix(),
         "source_hash": source_hash,
+        "source_hash_algorithm": "sha256",
+        "source_hash_mode": "normalized-text-lf-v1",
         "target_skill_path": target_skill_path,
         "source_confidence": source_skill.get("confidence", "unknown"),
         "source_recommendation": source_skill.get("recommendation", "unknown"),
@@ -803,7 +809,7 @@ def build_context(root: Path, *, project: str, output_root: Path) -> Path:
             continue
         write_template_text(context_dir / filename, content, force=True)
 
-    generated_hashes = {name: _sha256_file(context_dir / name) for name in rendered_files if name != "provenance.json"}
+    generated_hashes = {name: _sha256_portable_file(context_dir / name) for name in rendered_files if name != "provenance.json"}
     bundle["generated_hashes"] = generated_hashes
     provenance_content = json.dumps(bundle, indent=2, ensure_ascii=True, sort_keys=True) + "\n"
     write_template_text(context_dir / "provenance.json", provenance_content, force=True)
@@ -1046,6 +1052,10 @@ def _build_context_bundle(root: Path, project: str) -> dict[str, Any]:
         "project": project,
         "project_name": project_name,
         "generated_at": datetime.now(timezone.utc).isoformat(),
+        "hash_policy": {
+            "algorithm": "sha256",
+            "text_normalization": "lf-v1",
+        },
         "architecture": {
             "summary": "Three-layer memory: inbox, project, global.",
             "layers": ["inbox", "projects", "global"],
@@ -1311,7 +1321,7 @@ def _collect_context_sources(root: Path, project: str) -> list[dict[str, Any]]:
         refs.append(
             {
                 "path": path.relative_to(root).as_posix(),
-                "sha256": _sha256_file(path),
+                "sha256": _sha256_portable_file(path),
             }
         )
     return refs
@@ -1337,7 +1347,7 @@ def _list_decision_records(root: Path, project: str) -> list[dict[str, Any]]:
                     "summary": decision.get("summary", ""),
                     "status": decision.get("status", "unknown"),
                     "path": path.relative_to(root).as_posix(),
-                    "sha256": _sha256_file(path),
+                    "sha256": _sha256_portable_file(path),
                 }
             )
     return records
@@ -1348,11 +1358,44 @@ def _sha256_text(content: str) -> str:
 
 
 def _sha256_rendered_text(content: str) -> str:
-    return hashlib.sha256(content.replace("\n", os.linesep).encode("utf-8")).hexdigest()
+    return hashlib.sha256(_normalized_text_bytes(content)).hexdigest()
 
 
 def _sha256_file(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+_TEXT_HASH_SUFFIXES = {
+    ".json",
+    ".jsonl",
+    ".yaml",
+    ".yml",
+    ".md",
+    ".txt",
+    ".py",
+    ".ps1",
+    ".cmd",
+}
+
+
+def _normalized_text_bytes(content: str | Path) -> bytes:
+    if isinstance(content, Path):
+        text = content.read_text(encoding="utf-8")
+    else:
+        text = content
+    normalized = text.replace("\r\n", "\n").replace("\r", "\n")
+    return normalized.encode("utf-8")
+
+
+def _sha256_portable_file(path: Path) -> str:
+    if path.suffix.lower() in _TEXT_HASH_SUFFIXES:
+        try:
+            payload = _normalized_text_bytes(path)
+        except UnicodeDecodeError:
+            payload = path.read_bytes()
+    else:
+        payload = path.read_bytes()
+    return hashlib.sha256(payload).hexdigest()
 
 
 def context_check(root: Path, *, project: str, context_root: Path | None = None) -> list[str]:
@@ -1403,11 +1446,20 @@ def context_check(root: Path, *, project: str, context_root: Path | None = None)
         errors.append(f"{context_dir / 'provenance.json'}: generated_hashes must be an object")
     else:
         for name, expected_hash in current_render_hashes.items():
-            actual_hash = _sha256_file(context_dir / name)
+            actual_hash = _sha256_portable_file(context_dir / name)
             if generated_hashes.get(name) != actual_hash:
                 errors.append(f"{context_dir / name}: context is stale or modified")
             if actual_hash != expected_hash:
                 errors.append(f"{context_dir / name}: context diverges from source memory")
+
+    hash_policy = provenance.get("hash_policy")
+    if not isinstance(hash_policy, dict):
+        errors.append(f"{context_dir / 'provenance.json'}: hash_policy must be an object")
+    else:
+        if hash_policy.get("algorithm") != "sha256":
+            errors.append(f"{context_dir / 'provenance.json'}: unsupported hash algorithm")
+        if hash_policy.get("text_normalization") != "lf-v1":
+            errors.append(f"{context_dir / 'provenance.json'}: unsupported text normalization")
 
     rules = provenance.get("security_rules", [])
     if isinstance(rules, list):
@@ -1484,7 +1536,7 @@ def _check_applied_project_skills(root: Path, project: str, skills: list[dict[st
         if not source_file.exists():
             errors.append(f"applied skill {skill_id} missing source file: {source_skill_path}")
             continue
-        if _sha256_file(source_file) != source_hash:
+        if _sha256_portable_file(source_file) != source_hash:
             errors.append(f"applied skill {skill_id} has stale source hash: {source_skill_path}")
         source_skill = _safe_load_skill(source_file)
         if isinstance(origin_project, str) and source_skill.get("origin_project") not in {origin_project, project}:
@@ -3018,8 +3070,16 @@ def _audit_promotions(root: Path) -> list[str]:
         target_hash = event.get("target_hash")
         if source_hash is not None and not isinstance(source_hash, str):
             errors.append(f"{history}:{line_no}: source_hash must be a string")
+        elif isinstance(source_hash, str) and isinstance(source_path, str) and source_path and (root / source_path).exists():
+            source_skill_file = root / source_path / "skill.yaml"
+            if source_skill_file.exists() and _sha256_portable_file(source_skill_file) != source_hash:
+                errors.append(f"{history}:{line_no}: source_hash mismatch for {source_path}")
         if target_hash is not None and not isinstance(target_hash, str):
             errors.append(f"{history}:{line_no}: target_hash must be a string")
+        elif isinstance(target_hash, str) and isinstance(target_path, str) and target_path and (root / target_path).exists():
+            target_skill_file = root / target_path / "skill.yaml"
+            if target_skill_file.exists() and _sha256_portable_file(target_skill_file) != target_hash:
+                errors.append(f"{history}:{line_no}: target_hash mismatch for {target_path}")
         evaluation_ids = event.get("evaluation_ids", [])
         if isinstance(evaluation_ids, list):
             for evaluation_id in evaluation_ids:
@@ -3298,6 +3358,8 @@ def _audit_skill_applications(root: Path) -> list[str]:
         session = application.get("session")
         source_skill_path = application.get("source_skill_path")
         source_hash = application.get("source_hash")
+        source_hash_algorithm = application.get("source_hash_algorithm")
+        source_hash_mode = application.get("source_hash_mode")
         target_skill_path = application.get("target_skill_path")
         status = application.get("status")
         report_path = application.get("report_path")
@@ -3327,6 +3389,10 @@ def _audit_skill_applications(root: Path) -> list[str]:
         if not isinstance(source_hash, str) or not source_hash:
             errors.append(f"{application_file}: missing source_hash")
             continue
+        if source_hash_algorithm is not None and source_hash_algorithm != "sha256":
+            errors.append(f"{application_file}: source_hash_algorithm must be sha256")
+        if source_hash_mode is not None and source_hash_mode != "normalized-text-lf-v1":
+            errors.append(f"{application_file}: source_hash_mode must be normalized-text-lf-v1")
         if not isinstance(target_skill_path, str) or not target_skill_path:
             errors.append(f"{application_file}: missing target_skill_path")
         elif not (root / target_skill_path).exists():
@@ -3336,7 +3402,7 @@ def _audit_skill_applications(root: Path) -> list[str]:
         if not source_skill_file.exists():
             errors.append(f"{application_file}: missing source skill file {source_skill_path}")
             continue
-        if _sha256_file(source_skill_file) != source_hash:
+        if _sha256_portable_file(source_skill_file) != source_hash:
             errors.append(f"{application_file}: source hash mismatch for {source_skill_path}")
         source_skill = _safe_load_skill(source_skill_file)
         if source_skill.get("id") != skill_id:
@@ -3618,6 +3684,7 @@ def init_workspace(root: Path, *, force: bool = False) -> list[Path]:
             "version": "0.1.7",
             "status": "mvp",
             "runtime": {"python_candidates": ["python", "python3"]},
+            "hash_policy": {"algorithm": "sha256", "text_normalization": "lf-v1"},
             "layers": {
                 "inbox": {"purpose": "raw session evidence"},
                 "projects": {"purpose": "validated project-specific knowledge"},
@@ -3644,7 +3711,7 @@ def init_workspace(root: Path, *, force: bool = False) -> list[Path]:
         "schemas/decodex.schema.json": {
             "$schema": "https://json-schema.org/draft/2020-12/schema",
             "title": "Decodex Manifest",
-            "x-decodex-version": "0.1.3",
+            "x-decodex-version": "0.1.7",
             "type": "object",
             "required": ["name", "version", "status", "runtime", "layers", "registry", "conventions"],
             "properties": {
@@ -3661,7 +3728,7 @@ def init_workspace(root: Path, *, force: bool = False) -> list[Path]:
         "schemas/project.schema.json": {
             "$schema": "https://json-schema.org/draft/2020-12/schema",
             "title": "Decodex Project",
-            "x-decodex-version": "0.1.3",
+            "x-decodex-version": "0.1.7",
             "type": "object",
             "required": ["id", "name", "status", "domains"],
             "properties": {
@@ -3675,7 +3742,7 @@ def init_workspace(root: Path, *, force: bool = False) -> list[Path]:
         "schemas/session.schema.json": {
             "$schema": "https://json-schema.org/draft/2020-12/schema",
             "title": "Decodex Session",
-            "x-decodex-version": "0.1.3",
+            "x-decodex-version": "0.1.7",
             "type": "object",
             "required": ["id", "project", "date", "goal"],
             "properties": {
@@ -3689,7 +3756,7 @@ def init_workspace(root: Path, *, force: bool = False) -> list[Path]:
         "schemas/skill.schema.json": {
             "$schema": "https://json-schema.org/draft/2020-12/schema",
             "title": "Decodex Skill",
-            "x-decodex-version": "0.1.3",
+            "x-decodex-version": "0.1.7",
             "type": "object",
             "required": ["id", "title", "version", "status", "scope"],
             "properties": {
@@ -3720,7 +3787,7 @@ def init_workspace(root: Path, *, force: bool = False) -> list[Path]:
         "schemas/skill-application.schema.json": {
             "$schema": "https://json-schema.org/draft/2020-12/schema",
             "title": "Decodex Skill Application",
-            "x-decodex-version": "0.1.5",
+            "x-decodex-version": "0.1.7",
             "type": "object",
             "required": [
                 "id",
