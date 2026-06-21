@@ -521,8 +521,8 @@ def promote_skill(
         "from": from_scope,
         "to": to_scope,
         "project": project,
-        "source_path": str(source_dir.relative_to(root)),
-        "target_path": str(final_target.relative_to(root)),
+        "source_path": _workspace_relative_path(root, source_dir),
+        "target_path": _workspace_relative_path(root, final_target),
         "source_hash_algorithm": "sha256",
         "source_hash_mode": "normalized-text-lf-v1",
         "source_hash": _sha256_portable_file(source_dir / "skill.yaml") if (source_dir / "skill.yaml").exists() else None,
@@ -574,7 +574,7 @@ def skill_apply(
     application_dir.mkdir(parents=True, exist_ok=False)
     source_hash = _sha256_portable_file(source_skill_file)
 
-    target_skill_path = source_skill_file.relative_to(root).as_posix()
+    target_skill_path = _workspace_relative_path(root, source_skill_file)
     if not same_project:
         target_skill = dict(source_skill)
         target_skill["scope"] = "project"
@@ -595,7 +595,7 @@ def skill_apply(
             "source_hash": source_hash,
             "source_hash_algorithm": "sha256",
             "source_hash_mode": "normalized-text-lf-v1",
-            "source_skill_path": source_skill_file.relative_to(root).as_posix(),
+            "source_skill_path": _workspace_relative_path(root, source_skill_file),
         }
         target_skill_dir.mkdir(parents=True, exist_ok=False)
         dump_jsonish(target_skill_dir / "skill.yaml", target_skill)
@@ -605,7 +605,7 @@ def skill_apply(
         snapshot_dir = _skill_version_snapshot_dir(target_skill_dir, source_version)
         snapshot_dir.mkdir(parents=True, exist_ok=True)
         dump_jsonish(snapshot_dir / "skill.yaml", target_skill)
-        target_skill_path = (target_skill_dir / "skill.yaml").relative_to(root).as_posix()
+        target_skill_path = _workspace_relative_path(root, target_skill_dir / "skill.yaml")
     latest_review, latest_review_path = _latest_skill_artifact(source_skill_dir, "reviews")
     latest_evaluation, latest_evaluation_path = _latest_skill_artifact(source_skill_dir, "evaluations")
     application = {
@@ -617,7 +617,7 @@ def skill_apply(
         "target_project": to_project,
         "session": session,
         "status": "applied",
-        "source_skill_path": source_skill_file.relative_to(root).as_posix(),
+        "source_skill_path": _workspace_relative_path(root, source_skill_file),
         "source_hash": source_hash,
         "source_hash_algorithm": "sha256",
         "source_hash_mode": "normalized-text-lf-v1",
@@ -626,12 +626,12 @@ def skill_apply(
         "source_recommendation": source_skill.get("recommendation", "unknown"),
         "source_status": source_skill.get("status", "unknown"),
         "applied_at": datetime.now(timezone.utc).isoformat(),
-        "target_context_path": (target_project_dir / ".codex").relative_to(root).as_posix(),
-        "report_path": (application_dir / "report.md").relative_to(root).as_posix(),
+        "target_context_path": _workspace_relative_path(root, target_project_dir / ".codex"),
+        "report_path": _workspace_relative_path(root, application_dir / "report.md"),
         "latest_review_id": latest_review.get("id") if isinstance(latest_review, dict) else None,
-        "latest_review_path": latest_review_path.relative_to(root).as_posix() if latest_review_path else None,
+        "latest_review_path": _workspace_relative_path(root, latest_review_path) if latest_review_path else None,
         "latest_evaluation_id": latest_evaluation.get("id") if isinstance(latest_evaluation, dict) else None,
-        "latest_evaluation_path": latest_evaluation_path.relative_to(root).as_posix() if latest_evaluation_path else None,
+        "latest_evaluation_path": _workspace_relative_path(root, latest_evaluation_path) if latest_evaluation_path else None,
         "source_origin": source_skill.get("origin_project", from_project),
         "same_project": same_project,
     }
@@ -1002,9 +1002,9 @@ def _list_skill_promotion_candidates(root: Path, project: str) -> list[dict[str,
                 "safety_failures": candidate.get("safety_failures", 0),
                 "human_decision": candidate.get("human_decision", "pending"),
                 "promotion_executed": candidate.get("promotion_executed", False),
-                "candidate_path": candidate_file.relative_to(root).as_posix(),
-                "report_path": (candidate_file.parent / "report.md").relative_to(root).as_posix(),
-                "review_path": review_file.relative_to(root).as_posix() if review_file.exists() else None,
+                "candidate_path": _workspace_relative_path(root, candidate_file),
+                "report_path": _workspace_relative_path(root, candidate_file.parent / "report.md"),
+                "review_path": _workspace_relative_path(root, review_file) if review_file.exists() else None,
                 "review": review if isinstance(review, dict) else {},
             }
         )
@@ -1326,7 +1326,7 @@ def _collect_context_sources(root: Path, project: str) -> list[dict[str, Any]]:
             continue
         refs.append(
             {
-                "path": path.relative_to(root).as_posix(),
+                "path": _workspace_relative_path(root, path),
                 "sha256": _sha256_portable_file(path),
             }
         )
@@ -1352,7 +1352,7 @@ def _list_decision_records(root: Path, project: str) -> list[dict[str, Any]]:
                     "id": decision_id,
                     "summary": decision.get("summary", ""),
                     "status": decision.get("status", "unknown"),
-                    "path": path.relative_to(root).as_posix(),
+                    "path": _workspace_relative_path(root, path),
                     "sha256": _sha256_portable_file(path),
                 }
             )
@@ -1491,7 +1491,7 @@ def context_check(root: Path, *, project: str, context_root: Path | None = None)
 
 def _check_context_skills(root: Path, skills: list[dict[str, Any]]) -> list[str]:
     errors: list[str] = []
-    indexed_paths = {path.relative_to(root).as_posix(): path for path in _discover_skill_files(root)}
+    indexed_paths = {_workspace_relative_path(root, path): path for path in _discover_skill_files(root)}
     index = _load_skill_index(root)
     known_paths = set(index.keys())
     for skill in skills:
@@ -1886,8 +1886,8 @@ def _write_skill_candidates(
                         "",
                         "## Evidence",
                         "",
-                        f"- {str((session_dir / 'compliance-report.md').relative_to(root).as_posix())}",
-                        f"- {str((session_dir / 'feedback.yaml').relative_to(root).as_posix())}",
+                        f"- {_workspace_relative_path(root, session_dir / 'compliance-report.md')}",
+                        f"- {_workspace_relative_path(root, session_dir / 'feedback.yaml')}",
                         "",
                     ]
                 ),
@@ -1901,8 +1901,8 @@ def _write_skill_candidates(
             dump_jsonish(snapshot_dir / "skill.yaml", skill_data)
 
         evidence_paths = [
-            str((session_dir / "compliance-report.md").relative_to(root).as_posix()),
-            str((session_dir / "feedback.yaml").relative_to(root).as_posix()),
+            _workspace_relative_path(root, session_dir / "compliance-report.md"),
+            _workspace_relative_path(root, session_dir / "feedback.yaml"),
         ]
         evaluation = {
             "id": session_close_data["id"],
@@ -2346,7 +2346,7 @@ def skill_review(
         "evidence": sorted(
             dict.fromkeys(
                 [
-                    *(path.relative_to(root).as_posix() for path in evaluation_files),
+                    *(_workspace_relative_path(root, path) for path in evaluation_files),
                     *(
                         str(entry)
                         for evaluation in evaluations
@@ -2450,12 +2450,12 @@ def skill_approve(
     if approval_dir.exists():
         raise DecodexError(f"approval already exists: {approval_dir}")
     approval_dir.mkdir(parents=True, exist_ok=False)
-    evidence: list[str] = [review_file.relative_to(root).as_posix()]
+    evidence: list[str] = [_workspace_relative_path(root, review_file)]
     for evaluation_id in review.get("evaluation_ids", []):
         if isinstance(evaluation_id, str) and evaluation_id:
             evaluation_file = _find_skill_evaluation_file(root, skill_id, evaluation_id)
             if evaluation_file.exists():
-                evidence.append(evaluation_file.relative_to(root).as_posix())
+                evidence.append(_workspace_relative_path(root, evaluation_file))
 
     approval = {
         "id": approval_id,
@@ -2652,7 +2652,7 @@ def skill_promotion_candidate(
         "skill_version": skill_version,
         "project": project,
         "review_id": review_id,
-        "review_path": review_file.relative_to(root).as_posix(),
+        "review_path": _workspace_relative_path(root, review_file),
         "status": "candidate",
         "scope": "project",
         "confidence": review.get("confidence", "low"),
@@ -2671,7 +2671,7 @@ def skill_promotion_candidate(
         "decision_required": True,
         "evidence": review.get("evidence", []),
         "notes": review.get("notes", []),
-        "report_path": (candidate_dir / "report.md").relative_to(root).as_posix(),
+        "report_path": _workspace_relative_path(root, candidate_dir / "report.md"),
         "independent_reuses": len(application_ids),
     }
 
@@ -2728,7 +2728,7 @@ def skill_promotion_review(
         "scope": "project",
         "target_status": "global_candidate",
         "rationale": rationale,
-        "evidence": [candidate_file.relative_to(root).as_posix(), candidate_dir.joinpath("report.md").relative_to(root).as_posix()],
+        "evidence": [_workspace_relative_path(root, candidate_file), _workspace_relative_path(root, candidate_dir / "report.md")],
         "promotion_executed": False,
         "human_decision": decision,
     }
@@ -2949,7 +2949,7 @@ def _audit_duplicate_skill_ids(root: Path) -> list[str]:
         for file in files:
             scope = _skill_scope_for_path(root, file)
             if scope == "project":
-                parts = file.relative_to(root).parts
+                parts = ensure_within_root(root, file).relative_to(root.resolve()).parts
                 if len(parts) > 3:
                     project_scoped.setdefault(parts[1], []).append(file)
             elif scope == "global":
@@ -2966,7 +2966,7 @@ def _audit_duplicate_skill_ids(root: Path) -> list[str]:
 
 
 def _skill_scope_for_path(root: Path, path: Path) -> str:
-    relative = path.relative_to(root).parts
+    relative = ensure_within_root(root, path).relative_to(root.resolve()).parts
     if relative[:2] == ("global", "skills"):
         return "global"
     if relative[:1] == ("projects",):
@@ -2982,8 +2982,8 @@ def _has_matching_promotion_event(root: Path, skill_id: str, files: list[Path]) 
     global_file = next((path for path in files if _skill_scope_for_path(root, path) == "global"), None)
     if project_file is None or global_file is None:
         return False
-    source_path = project_file.relative_to(root).parent.as_posix()
-    target_path = global_file.relative_to(root).parent.as_posix()
+    source_path = _workspace_relative_path(root, project_file.parent)
+    target_path = _workspace_relative_path(root, global_file.parent)
     for line in history.read_text(encoding="utf-8").splitlines():
         if not line.strip():
             continue
@@ -3002,7 +3002,7 @@ def _has_matching_application_event(root: Path, skill_id: str, files: list[Path]
     application_files = _discover_skill_application_files(root)
     if not application_files:
         return False
-    project_files = [path.relative_to(root).as_posix() for path in files if _skill_scope_for_path(root, path) == "project"]
+    project_files = [_workspace_relative_path(root, path) for path in files if _skill_scope_for_path(root, path) == "project"]
     if len(project_files) != 2:
         return False
     for application_path in application_files:
@@ -3423,7 +3423,9 @@ def _audit_skill_applications(root: Path) -> list[str]:
             errors.append(f"{application_file}: self-application must point to the active project skill")
 
         expected_session_dir = root / "projects" / str(target_project) / "sessions" / str(session)
-        if not application_file.is_relative_to(expected_session_dir):
+        try:
+            ensure_within_root(expected_session_dir, application_file)
+        except DecodexError:
             errors.append(f"{application_file}: application is not stored under the declared session")
 
         if isinstance(report_path, str) and report_path:
