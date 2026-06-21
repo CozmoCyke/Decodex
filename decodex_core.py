@@ -272,6 +272,18 @@ def validate_repository(root: Path) -> list[str]:
         except DecodexError as exc:
             errors.append(str(exc))
 
+    for candidate_path in _discover_skill_promotion_candidate_files(root):
+        try:
+            errors.extend(validate_json_schema_file(candidate_path, root / "schemas" / "skill-promotion-candidate.schema.json"))
+        except DecodexError as exc:
+            errors.append(str(exc))
+
+    for promotion_review_path in _discover_skill_promotion_review_files(root):
+        try:
+            errors.extend(validate_json_schema_file(promotion_review_path, root / "schemas" / "skill-promotion-review.schema.json"))
+        except DecodexError as exc:
+            errors.append(str(exc))
+
     return errors
 
 
@@ -286,6 +298,7 @@ def audit_repository(root: Path) -> list[str]:
     errors.extend(_audit_skill_lifecycle(root))
     errors.extend(_audit_skill_applications(root))
     errors.extend(_audit_skill_approvals(root))
+    errors.extend(_audit_skill_promotion_candidates(root))
     errors.extend(_audit_skill_transitions(root))
     errors.extend(_audit_absolute_paths(root))
     errors.extend(_audit_tracked_generated_files(root))
@@ -371,6 +384,28 @@ def _discover_skill_approval_files(root: Path) -> list[Path]:
         if not base.exists():
             continue
         for path in base.rglob("approvals/*/approval.yaml"):
+            if path.is_file():
+                files.append(path)
+    return sorted({path.resolve() for path in files})
+
+
+def _discover_skill_promotion_candidate_files(root: Path) -> list[Path]:
+    files: list[Path] = []
+    for base in [root / "global" / "skills", root / "projects"]:
+        if not base.exists():
+            continue
+        for path in base.rglob("promotion-candidates/*/candidate.yaml"):
+            if path.is_file():
+                files.append(path)
+    return sorted({path.resolve() for path in files})
+
+
+def _discover_skill_promotion_review_files(root: Path) -> list[Path]:
+    files: list[Path] = []
+    for base in [root / "global" / "skills", root / "projects"]:
+        if not base.exists():
+            continue
+        for path in base.rglob("promotion-candidates/*/review.yaml"):
             if path.is_file():
                 files.append(path)
     return sorted({path.resolve() for path in files})
@@ -917,11 +952,91 @@ def _list_applied_skill_records(root: Path, project: str) -> list[dict[str, Any]
     return records
 
 
+def _list_skill_promotion_candidates(root: Path, project: str) -> list[dict[str, Any]]:
+    records: list[dict[str, Any]] = []
+    project_root = root / "projects" / project / "skills"
+    if not project_root.exists():
+        return records
+    for candidate_file in sorted(project_root.rglob("promotion-candidates/*/candidate.yaml")):
+        try:
+            candidate = load_jsonish(candidate_file)
+        except DecodexError:
+            continue
+        if not isinstance(candidate, dict):
+            continue
+        candidate_id = candidate.get("id")
+        skill_id = candidate.get("skill_id")
+        if not isinstance(candidate_id, str) or not candidate_id:
+            continue
+        if not isinstance(skill_id, str) or not skill_id:
+            continue
+        review_file = candidate_file.parent / "review.yaml"
+        review = _safe_load_skill(review_file) if review_file.exists() else {}
+        records.append(
+            {
+                "id": candidate_id,
+                "skill_id": skill_id,
+                "skill_version": candidate.get("skill_version", "unknown"),
+                "project": candidate.get("project", project),
+                "review_id": candidate.get("review_id"),
+                "confidence": candidate.get("confidence", "unknown"),
+                "recommendation": candidate.get("recommendation", "unknown"),
+                "valid_runs": candidate.get("valid_runs", 0),
+                "success_rate": candidate.get("success_rate", 0.0),
+                "independent_projects": candidate.get("independent_projects", 0),
+                "cross_project_reuse": candidate.get("cross_project_reuse", False),
+                "independent_reuses": candidate.get("independent_reuses", 0),
+                "unresolved_contradictions": candidate.get("unresolved_contradictions", 0),
+                "safety_failures": candidate.get("safety_failures", 0),
+                "human_decision": candidate.get("human_decision", "pending"),
+                "promotion_executed": candidate.get("promotion_executed", False),
+                "candidate_path": candidate_file.relative_to(root).as_posix(),
+                "report_path": (candidate_file.parent / "report.md").relative_to(root).as_posix(),
+                "review_path": review_file.relative_to(root).as_posix() if review_file.exists() else None,
+                "review": review if isinstance(review, dict) else {},
+            }
+        )
+    return records
+
+
+def _global_promotion_readiness(root: Path, project: str) -> dict[str, Any] | None:
+    candidates = _list_skill_promotion_candidates(root, project)
+    if not candidates:
+        return None
+    chosen = sorted(candidates, key=lambda item: str(item.get("candidate_path", "")))[-1]
+    review = chosen.get("review") if isinstance(chosen.get("review"), dict) else {}
+    human_decision = review.get("decision", chosen.get("human_decision", "pending"))
+    return {
+        "skill_id": chosen["skill_id"],
+        "candidate_id": chosen["id"],
+        "skill_version": chosen.get("skill_version", "unknown"),
+        "status": review.get("decision_status", chosen.get("human_decision", "pending")),
+        "confidence": chosen.get("confidence", "unknown"),
+        "recommendation": chosen.get("recommendation", "unknown"),
+        "valid_runs": chosen.get("valid_runs", 0),
+        "success_rate": chosen.get("success_rate", 0.0),
+        "independent_projects": chosen.get("independent_projects", 0),
+        "cross_project_reuse": chosen.get("cross_project_reuse", False),
+        "independent_reuses": chosen.get("independent_reuses", 0),
+        "unresolved_contradictions": chosen.get("unresolved_contradictions", 0),
+        "safety_failures": chosen.get("safety_failures", 0),
+        "human_decision": human_decision,
+        "promotion_executed": chosen.get("promotion_executed", False),
+        "review_id": chosen.get("review_id"),
+        "reviewer": review.get("reviewer"),
+        "candidate_path": chosen.get("candidate_path"),
+        "review_path": chosen.get("review_path"),
+        "report_path": chosen.get("report_path"),
+    }
+
+
 def _build_context_bundle(root: Path, project: str) -> dict[str, Any]:
     project_skills = _list_skill_records(root, root / "projects" / project / "skills")
     applied_project_skills = _list_applied_skill_records(root, project)
     inherited_skills = _list_skill_records(root, root / "global" / "skills")
     decisions = _list_decision_records(root, project)
+    promotion_candidates = _list_skill_promotion_candidates(root, project)
+    global_promotion_readiness = _global_promotion_readiness(root, project)
     source_refs = _collect_context_sources(root, project)
     source_hashes = {ref["path"]: ref["sha256"] for ref in source_refs}
     project_file = load_jsonish(root / "projects" / project / "project.yaml") if (root / "projects" / project / "project.yaml").exists() else {}
@@ -969,6 +1084,8 @@ def _build_context_bundle(root: Path, project: str) -> dict[str, Any]:
         "project_skills": project_skills,
         "applied_project_skills": applied_project_skills,
         "inherited_skills": inherited_skills,
+        "promotion_candidates": promotion_candidates,
+        "global_promotion_readiness": global_promotion_readiness,
         "source_files": source_refs,
         "source_hashes": source_hashes,
     }
@@ -1069,7 +1186,30 @@ def _render_context_files(bundle: dict[str, Any]) -> dict[str, str]:
         project_context.extend(
             [
                 "## Validation Note",
-                "- This skill is validated for the project Decodex, but it is not yet global.",
+                f"- This skill is validated for the `{project}` project, but it is not global.",
+                "",
+            ]
+        )
+
+    global_promotion_readiness = bundle.get("global_promotion_readiness")
+    if global_promotion_readiness:
+        project_context.extend(
+            [
+                "## Global Promotion Readiness",
+                f"- skill: {global_promotion_readiness.get('skill_id', 'unknown')}",
+                f"- candidate: {global_promotion_readiness.get('candidate_id', 'unknown')}",
+                f"- status: {global_promotion_readiness.get('status', 'unknown')}",
+                f"- confidence: {global_promotion_readiness.get('confidence', 'unknown')}",
+                f"- recommendation: {global_promotion_readiness.get('recommendation', 'unknown')}",
+                f"- valid_runs: {global_promotion_readiness.get('valid_runs', 0)}",
+                f"- success_rate: {global_promotion_readiness.get('success_rate', 0.0)}",
+                f"- independent_projects: {global_promotion_readiness.get('independent_projects', 0)}",
+                f"- independent_reuses: {global_promotion_readiness.get('independent_reuses', 0)}",
+                f"- cross_project_reuse: {global_promotion_readiness.get('cross_project_reuse', False)}",
+                f"- human_decision: {global_promotion_readiness.get('human_decision', 'pending')}",
+                f"- reviewer: {global_promotion_readiness.get('reviewer', 'none')}",
+                f"- report_path: {global_promotion_readiness.get('report_path', 'none')}",
+                f"- promotion_executed: {global_promotion_readiness.get('promotion_executed', False)}",
                 "",
             ]
         )
@@ -1141,6 +1281,8 @@ def _collect_context_sources(root: Path, project: str) -> list[dict[str, Any]]:
     source_paths.extend(_discover_skill_artifact_files(root, "reviews"))
     source_paths.extend(_discover_skill_artifact_files(root, "revisions"))
     source_paths.extend(_discover_skill_approval_files(root))
+    source_paths.extend(_discover_skill_promotion_candidate_files(root))
+    source_paths.extend(_discover_skill_promotion_review_files(root))
     application_files = _discover_skill_application_files(root)
     source_paths.extend(application_files)
     source_paths.append(_discover_skill_transition_history(root))
@@ -1158,6 +1300,10 @@ def _collect_context_sources(root: Path, project: str) -> list[dict[str, Any]]:
         target_project = application.get("target_project")
         if isinstance(session, str) and session and isinstance(target_project, str) and target_project:
             source_paths.append(root / "projects" / target_project / "sessions" / session / "session.yaml")
+    for candidate_file in _discover_skill_promotion_candidate_files(root):
+        source_paths.append(candidate_file.parent / "report.md")
+    for review_file in _discover_skill_promotion_review_files(root):
+        source_paths.append(review_file.parent / "review.md")
     refs: list[dict[str, Any]] = []
     for path in source_paths:
         if not path.exists() or not path.is_file():
@@ -1773,8 +1919,13 @@ def _render_skill_review(review: dict[str, Any]) -> str:
         f"- recommendation: {review['recommendation']}",
         f"- approved_by: {review.get('approved_by') or 'none'}",
         f"- valid_runs: {review.get('valid_runs', 0)}",
+        f"- successful_evaluations: {review.get('successful_evaluations', 0)}",
+        f"- runs_total: {review.get('runs_total', 0)}",
+        f"- successful_runs_total: {review.get('successful_runs_total', 0)}",
+        f"- success_rate: {review.get('success_rate', 0.0)}",
         f"- projects_tested: {', '.join(review.get('projects_tested', [])) or 'none'}",
         f"- independent_projects: {review.get('independent_projects', 0)}",
+        f"- independent_reuses: {review.get('independent_reuses', 0)}",
         f"- applications_considered: {review.get('applications_considered', 0)}",
         f"- cross_project_reuse: {review.get('cross_project_reuse', False)}",
         f"- unresolved_contradictions: {review.get('unresolved_contradictions', 0)}",
@@ -1821,6 +1972,62 @@ def _render_skill_approval(approval: dict[str, Any]) -> str:
             f"- {approval.get('rationale') or 'none'}",
         ]
     )
+    return "\n".join(lines)
+
+
+def _render_skill_promotion_candidate(candidate: dict[str, Any]) -> str:
+    lines = [
+        "# Skill Promotion Candidate",
+        "",
+        f"- id: {candidate['id']}",
+        f"- skill_id: {candidate['skill_id']}",
+        f"- skill_version: {candidate['skill_version']}",
+        f"- project: {candidate['project']}",
+        f"- review_id: {candidate['review_id']}",
+        f"- report_path: {candidate.get('report_path', 'unknown')}",
+        f"- confidence: {candidate.get('confidence', 'unknown')}",
+        f"- recommendation: {candidate.get('recommendation', 'unknown')}",
+        f"- valid_runs: {candidate.get('valid_runs', 0)}",
+        f"- success_rate: {candidate.get('success_rate', 0.0)}",
+        f"- independent_projects: {candidate.get('independent_projects', 0)}",
+        f"- independent_reuses: {candidate.get('independent_reuses', 0)}",
+        f"- cross_project_reuse: {candidate.get('cross_project_reuse', False)}",
+        f"- unresolved_contradictions: {candidate.get('unresolved_contradictions', 0)}",
+        f"- safety_failures: {candidate.get('safety_failures', 0)}",
+        f"- human_decision: {candidate.get('human_decision', 'pending')}",
+        f"- promotion_executed: {candidate.get('promotion_executed', False)}",
+        "",
+        "## Evidence",
+    ]
+    for evidence in candidate.get("evidence", []):
+        lines.append(f"- {evidence}")
+    lines.append("")
+    return "\n".join(lines)
+
+
+def _render_skill_promotion_review(review: dict[str, Any]) -> str:
+    lines = [
+        "# Skill Promotion Review",
+        "",
+        f"- id: {review['id']}",
+        f"- candidate_id: {review['candidate_id']}",
+        f"- skill_id: {review['skill_id']}",
+        f"- skill_version: {review['skill_version']}",
+        f"- project: {review['project']}",
+        f"- reviewer: {review['reviewer']}",
+        f"- decision: {review['decision']}",
+        f"- decision_status: {review.get('decision_status', 'unknown')}",
+        f"- target_status: {review.get('target_status', 'unknown')}",
+        f"- promotion_executed: {review.get('promotion_executed', False)}",
+        "",
+        "## Rationale",
+        review.get("rationale", ""),
+        "",
+        "## Evidence",
+    ]
+    for evidence in review.get("evidence", []):
+        lines.append(f"- {evidence}")
+    lines.append("")
     return "\n".join(lines)
 
 
@@ -1969,6 +2176,7 @@ def skill_review(
     review_dir = skill_dir / "reviews" / review_id
     review_dir.mkdir(parents=True, exist_ok=False)
     evaluations: list[dict[str, Any]] = []
+    evaluation_files: list[Path] = []
     if evaluation_ids:
         for evaluation_id in evaluation_ids:
             evaluation_file = _find_skill_evaluation_file(root, skill_id, evaluation_id)
@@ -1976,7 +2184,32 @@ def skill_review(
                 raise DecodexError(f"missing evaluation for review: {evaluation_file}")
             evaluation = _safe_load_skill(evaluation_file)
             evaluations.append(evaluation)
-    valid_runs = sum(1 for evaluation in evaluations if isinstance(evaluation, dict) and evaluation.get("status") == "passed")
+            evaluation_files.append(evaluation_file)
+    valid_runs = sum(
+        1
+        for evaluation in evaluations
+        if isinstance(evaluation, dict) and evaluation.get("status") in {"passed", "success"}
+    )
+    successful_evaluations = sum(
+        1
+        for evaluation in evaluations
+        if isinstance(evaluation, dict)
+        and evaluation.get("status") in {"passed", "success"}
+        and isinstance(evaluation.get("runs"), int)
+        and isinstance(evaluation.get("successful_runs"), int)
+        and evaluation.get("successful_runs") >= evaluation.get("runs")
+    )
+    runs_total = sum(
+        int(evaluation.get("runs", 0))
+        for evaluation in evaluations
+        if isinstance(evaluation, dict) and isinstance(evaluation.get("runs"), int)
+    )
+    successful_runs_total = sum(
+        int(evaluation.get("successful_runs", 0))
+        for evaluation in evaluations
+        if isinstance(evaluation, dict) and isinstance(evaluation.get("successful_runs"), int)
+    )
+    success_rate = round(successful_evaluations / valid_runs, 3) if valid_runs else 0.0
     projects_tested = sorted(
         {
             str(evaluation.get("project"))
@@ -1994,6 +2227,7 @@ def skill_review(
     applications_considered = max(len(evaluations), len(application_ids))
     independent_projects = len(projects_tested)
     cross_project_reuse = independent_projects > 1
+    independent_reuses = len(application_ids)
     unresolved_contradictions = sorted(
         {
             contradiction
@@ -2009,7 +2243,7 @@ def skill_review(
     safety_failures = sum(
         1
         for evaluation in evaluations
-        if isinstance(evaluation, dict) and evaluation.get("status") != "passed"
+        if isinstance(evaluation, dict) and evaluation.get("status") not in {"passed", "success"}
     )
     versions_tested = sorted(
         {
@@ -2051,11 +2285,32 @@ def skill_review(
         "evaluation_ids": evaluation_ids or [],
         "recommendation": recommendation,
         "confidence": confidence,
-        "evidence": [],
+        "evidence": sorted(
+            dict.fromkeys(
+                [
+                    *(path.relative_to(root).as_posix() for path in evaluation_files),
+                    *(
+                        str(entry)
+                        for evaluation in evaluations
+                        for entry in (
+                            evaluation.get("evidence", [])
+                            if isinstance(evaluation.get("evidence", []), list)
+                            else []
+                        )
+                        if isinstance(entry, str) and entry
+                    ),
+                ]
+            )
+        ),
         "notes": notes or [],
         "valid_runs": valid_runs,
+        "successful_evaluations": successful_evaluations,
+        "runs_total": runs_total,
+        "successful_runs_total": successful_runs_total,
+        "success_rate": success_rate,
         "projects_tested": projects_tested,
         "independent_projects": independent_projects,
+        "independent_reuses": independent_reuses,
         "applications_considered": applications_considered,
         "cross_project_reuse": cross_project_reuse,
         "divergences": divergences,
@@ -2279,6 +2534,151 @@ def skill_transition(
     return skill_file, transition_history
 
 
+def skill_promotion_candidate(
+    root: Path,
+    *,
+    project: str,
+    skill_id: str,
+    candidate_id: str,
+    review_id: str,
+) -> tuple[Path, Path]:
+    skill_dir = _skill_dir(root, skill_id, "project", project=project)
+    skill_file = skill_dir / "skill.yaml"
+    if not skill_file.exists():
+        raise DecodexError(f"skill not found: {skill_file}")
+
+    review_file = _find_skill_review_file(root, skill_id, review_id)
+    if not review_file.exists():
+        raise DecodexError(f"review not found: {review_file}")
+    review = _safe_load_skill(review_file)
+    if not isinstance(review, dict):
+        raise DecodexError(f"invalid review artifact: {review_file}")
+
+    if review.get("recommendation") != "promote_global":
+        raise DecodexError("promotion candidate requires promote_global review recommendation")
+    if review.get("confidence") != "high":
+        raise DecodexError("promotion candidate requires high review confidence")
+    if review.get("valid_runs") != 5:
+        raise DecodexError("promotion candidate requires five valid runs")
+    if review.get("independent_projects") != 3 or review.get("cross_project_reuse") is not True:
+        raise DecodexError("promotion candidate requires evidence from three projects")
+    if review.get("unresolved_contradictions", 0) != 0:
+        raise DecodexError("promotion candidate requires zero unresolved contradictions")
+    if review.get("safety_failures", 0) != 0:
+        raise DecodexError("promotion candidate requires zero safety failures")
+
+    skill_data = _safe_load_skill(skill_file)
+    skill_version = skill_data.get("version", "0.1.0")
+    candidate_dir = skill_dir / "promotion-candidates" / candidate_id
+    if candidate_dir.exists():
+        raise DecodexError(f"promotion candidate already exists: {candidate_dir}")
+    candidate_dir.mkdir(parents=True, exist_ok=False)
+    application_ids: set[str] = set()
+    if isinstance(review.get("evaluation_ids"), list):
+        for evaluation_id in review["evaluation_ids"]:
+            if not isinstance(evaluation_id, str) or not evaluation_id:
+                continue
+            evaluation_file = _find_skill_evaluation_file(root, skill_id, evaluation_id)
+            if not evaluation_file.exists():
+                continue
+            evaluation = _safe_load_skill(evaluation_file)
+            if not isinstance(evaluation, dict):
+                continue
+            application_id = evaluation.get("application_id")
+            if isinstance(application_id, str) and application_id:
+                application_ids.add(application_id)
+
+    candidate = {
+        "id": candidate_id,
+        "skill_id": skill_id,
+        "skill_version": skill_version,
+        "project": project,
+        "review_id": review_id,
+        "review_path": review_file.relative_to(root).as_posix(),
+        "status": "candidate",
+        "scope": "project",
+        "confidence": review.get("confidence", "low"),
+        "recommendation": review.get("recommendation", "continue_evaluation"),
+        "valid_runs": review.get("valid_runs", 0),
+        "runs_total": review.get("runs_total", 0),
+        "successful_runs_total": review.get("successful_runs_total", 0),
+        "success_rate": review.get("success_rate", 0.0),
+        "independent_projects": review.get("independent_projects", 0),
+        "cross_project_reuse": review.get("cross_project_reuse", False),
+        "independent_reuses": len(review.get("evaluation_ids", [])),
+        "unresolved_contradictions": review.get("unresolved_contradictions", 0),
+        "safety_failures": review.get("safety_failures", 0),
+        "human_decision": "pending",
+        "promotion_executed": False,
+        "decision_required": True,
+        "evidence": review.get("evidence", []),
+        "notes": review.get("notes", []),
+        "report_path": (candidate_dir / "report.md").relative_to(root).as_posix(),
+        "independent_reuses": len(application_ids),
+    }
+
+    dump_jsonish(candidate_dir / "candidate.yaml", candidate)
+    write_template_text(candidate_dir / "report.md", _render_skill_promotion_candidate(candidate), force=True)
+    return candidate_dir / "candidate.yaml", candidate_dir / "report.md"
+
+
+def skill_promotion_review(
+    root: Path,
+    *,
+    project: str,
+    skill_id: str,
+    candidate_id: str,
+    review_id: str,
+    decision: str,
+    reviewer: str,
+    rationale: str,
+) -> tuple[Path, Path]:
+    skill_dir = _skill_dir(root, skill_id, "project", project=project)
+    candidate_dir = skill_dir / "promotion-candidates" / candidate_id
+    candidate_file = candidate_dir / "candidate.yaml"
+    if not candidate_file.exists():
+        raise DecodexError(f"promotion candidate not found: {candidate_file}")
+    candidate = _safe_load_skill(candidate_file)
+    if not isinstance(candidate, dict):
+        raise DecodexError(f"invalid promotion candidate artifact: {candidate_file}")
+    if candidate.get("skill_id") != skill_id:
+        raise DecodexError("promotion candidate skill mismatch")
+
+    allowed_decisions = {
+        "approve_global_promotion": "global_promotion_ready",
+        "defer": "pending",
+        "reject": "rejected",
+        "request_revision": "revision_required",
+    }
+    if decision not in allowed_decisions:
+        raise DecodexError(f"unsupported promotion review decision: {decision}")
+
+    review_file = candidate_dir / "review.yaml"
+    if review_file.exists():
+        raise DecodexError(f"promotion review already exists: {review_file}")
+    review = {
+        "id": review_id,
+        "candidate_id": candidate_id,
+        "skill_id": skill_id,
+        "skill_version": candidate.get("skill_version", "unknown"),
+        "project": project,
+        "reviewer": reviewer,
+        "date": datetime.now(timezone.utc).date().isoformat(),
+        "status": "recorded",
+        "decision": decision,
+        "decision_status": allowed_decisions[decision],
+        "scope": "project",
+        "target_status": "global_candidate",
+        "rationale": rationale,
+        "evidence": [candidate_file.relative_to(root).as_posix(), candidate_dir.joinpath("report.md").relative_to(root).as_posix()],
+        "promotion_executed": False,
+        "human_decision": decision,
+    }
+    dump_jsonish(review_file, review)
+    write_template_text(candidate_dir / "review.md", _render_skill_promotion_review(review), force=True)
+    return review_file, candidate_dir / "review.md"
+
+
 def skill_revise(
     root: Path,
     *,
@@ -2486,13 +2886,24 @@ def _audit_duplicate_skill_ids(root: Path) -> list[str]:
     for skill_id, files in seen.items():
         if len(files) <= 1:
             continue
-        scopes = {_skill_scope_for_path(root, file) for file in files}
-        if len(files) == 2 and (
-            (scopes == {"project", "global"} and _has_matching_promotion_event(root, skill_id, files))
-            or (scopes == {"project"} and _has_matching_application_event(root, skill_id, files))
-        ):
+        project_scoped: dict[str, list[Path]] = {}
+        global_scoped: list[Path] = []
+        for file in files:
+            scope = _skill_scope_for_path(root, file)
+            if scope == "project":
+                parts = file.relative_to(root).parts
+                if len(parts) > 3:
+                    project_scoped.setdefault(parts[1], []).append(file)
+            elif scope == "global":
+                global_scoped.append(file)
+        if any(len(project_files) > 1 for project_files in project_scoped.values()):
+            errors.append(f"duplicate skill id {skill_id}: " + ", ".join(str(path) for path in files))
             continue
-        errors.append(f"duplicate skill id {skill_id}: " + ", ".join(str(path) for path in files))
+        if len(global_scoped) > 1:
+            errors.append(f"duplicate skill id {skill_id}: " + ", ".join(str(path) for path in files))
+            continue
+        if global_scoped and project_scoped and not _has_matching_promotion_event(root, skill_id, files):
+            errors.append(f"duplicate skill id {skill_id}: " + ", ".join(str(path) for path in files))
     return errors
 
 
@@ -2620,6 +3031,87 @@ def _audit_promotions(root: Path) -> list[str]:
         approved_by = event.get("approved_by")
         if approved_by is not None and not isinstance(approved_by, str):
             errors.append(f"{history}:{line_no}: approved_by must be a string")
+    return errors
+
+
+def _audit_skill_promotion_candidates(root: Path) -> list[str]:
+    errors: list[str] = []
+    for candidate_file in _discover_skill_promotion_candidate_files(root):
+        try:
+            candidate = load_jsonish(candidate_file)
+        except DecodexError as exc:
+            errors.append(str(exc))
+            continue
+        if not isinstance(candidate, dict):
+            continue
+
+        candidate_id = candidate.get("id")
+        skill_id = candidate.get("skill_id")
+        skill_version = candidate.get("skill_version")
+        review_id = candidate.get("review_id")
+        review_path = candidate.get("review_path")
+        report_path = candidate.get("report_path")
+        human_decision = candidate.get("human_decision")
+        promotion_executed = candidate.get("promotion_executed")
+
+        if not isinstance(candidate_id, str) or not candidate_id:
+            errors.append(f"{candidate_file}: missing candidate id")
+        if not isinstance(skill_id, str) or not skill_id:
+            errors.append(f"{candidate_file}: missing skill_id")
+            continue
+        if not isinstance(skill_version, str) or not skill_version:
+            errors.append(f"{candidate_file}: missing skill_version")
+        if not isinstance(review_id, str) or not review_id:
+            errors.append(f"{candidate_file}: missing review_id")
+        if not isinstance(review_path, str) or not review_path:
+            errors.append(f"{candidate_file}: missing review_path")
+        elif not (root / review_path).exists():
+            errors.append(f"{candidate_file}: missing review file {review_path}")
+        if not isinstance(report_path, str) or not report_path:
+            errors.append(f"{candidate_file}: missing report_path")
+        elif not (root / report_path).exists():
+            errors.append(f"{candidate_file}: missing report file {report_path}")
+        if human_decision != "pending":
+            errors.append(f"{candidate_file}: human_decision must remain pending until review")
+        if promotion_executed is not False:
+            errors.append(f"{candidate_file}: promotion_executed must remain false")
+        if candidate.get("valid_runs") != 5:
+            errors.append(f"{candidate_file}: valid_runs must equal five")
+        if candidate.get("success_rate") != 0.8:
+            errors.append(f"{candidate_file}: success_rate must equal 0.8")
+        if candidate.get("independent_projects") != 3:
+            errors.append(f"{candidate_file}: independent_projects must equal three")
+        if candidate.get("cross_project_reuse") is not True:
+            errors.append(f"{candidate_file}: cross_project_reuse must be true")
+        if candidate.get("independent_reuses") != 2:
+            errors.append(f"{candidate_file}: independent_reuses must equal two")
+        if candidate.get("unresolved_contradictions") != 0:
+            errors.append(f"{candidate_file}: unresolved_contradictions must remain zero")
+        if candidate.get("safety_failures") != 0:
+            errors.append(f"{candidate_file}: safety_failures must remain zero")
+
+        review_file = candidate_file.parent / "review.yaml"
+        if review_file.exists():
+            try:
+                review = load_jsonish(review_file)
+            except DecodexError as exc:
+                errors.append(str(exc))
+                continue
+            if not isinstance(review, dict):
+                continue
+            if review.get("candidate_id") != candidate_id:
+                errors.append(f"{review_file}: candidate_id mismatch")
+            if review.get("skill_id") != skill_id:
+                errors.append(f"{review_file}: skill_id mismatch")
+            if review.get("promotion_executed") is not False:
+                errors.append(f"{review_file}: promotion_executed must remain false")
+            if review.get("decision") not in {"approve_global_promotion", "defer", "reject", "request_revision"}:
+                errors.append(f"{review_file}: unsupported decision")
+
+        global_skill = root / "global" / "skills" / skill_id / "skill.yaml"
+        if global_skill.exists():
+            errors.append(f"{candidate_file}: global skill must not exist for promotion candidate {skill_id}")
+
     return errors
 
 
@@ -3123,7 +3615,7 @@ def init_workspace(root: Path, *, force: bool = False) -> list[Path]:
     json_templates = {
         "decodex.yaml": {
             "name": "Decodex",
-            "version": "0.1.6",
+            "version": "0.1.7",
             "status": "mvp",
             "runtime": {"python_candidates": ["python", "python3"]},
             "layers": {

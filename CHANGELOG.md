@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.1.7 -- Global Promotion Readiness
+
+Decodex now records a candidate dossier for global promotion readiness without creating a global skill copy before human review.
+
+### Added
+
+* `skill-promotion-candidate` to package a global-promotion dossier
+* `skill-promotion-review` to record the human decision separately
+* global promotion readiness in compiled project context
+* promotion-candidate schemas and audit checks
+* `surepython` as a third real project for evidence aggregation
+
 ## v0.1.6 -- Supervised Project Validation
 
 Decodex now supports a supervised project-validation flow for reusable skills. A skill can be evaluated across real projects, reviewed with evidence, approved for project scope by a human, and transitioned without becoming global.

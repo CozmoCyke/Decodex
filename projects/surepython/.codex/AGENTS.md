@@ -1,6 +1,6 @@
 # AGENTS
 
-Project: decodex
+Project: surepython
 
 Use this compiled context as a working contract, not as source of truth.
 

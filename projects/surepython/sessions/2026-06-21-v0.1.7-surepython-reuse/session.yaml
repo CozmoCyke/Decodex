@@ -1,0 +1,11 @@
+{
+  "id": "2026-06-21-v0.1.7-surepython-reuse",
+  "project": "surepython",
+  "date": "2026-06-21",
+  "goal": "Record the first surepython reuse evidence for context-compliance-review.",
+  "artifacts": [
+    "report.md",
+    "compliance-report.md",
+    "feedback.yaml"
+  ]
+}

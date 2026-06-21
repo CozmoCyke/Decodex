@@ -9,6 +9,11 @@
       "id": "pac-hunt-2",
       "status": "active",
       "path": "projects/pac-hunt-2"
+    },
+    {
+      "id": "surepython",
+      "status": "active",
+      "path": "projects/surepython"
     }
   ]
 }

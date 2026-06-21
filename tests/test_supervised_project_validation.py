@@ -50,7 +50,7 @@ class SupervisedProjectValidationTests(unittest.TestCase):
             ("skill_confidence", SKILL, "yaml", ("confidence", "medium")),
             ("transition_exists", TRANSITIONS, "exists", True),
             ("transition_global", TRANSITIONS, "contains", '"global":false'),
-            ("context_note", CONTEXT, "contains", "validated for the `decodex` project, but it is not global"),
+            ("context_note", CONTEXT, "contains", "validated for the `decodex` project, but it is not global."),
         ]
 
         for name, path, kind, expected in cases:

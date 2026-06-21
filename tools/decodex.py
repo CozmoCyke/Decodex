@@ -25,6 +25,8 @@ from decodex_core import (
     skill_evaluate,
     skill_revise,
     skill_review,
+    skill_promotion_candidate,
+    skill_promotion_review,
     skill_transition,
     session_close,
     resolve_python_interpreter,
@@ -184,6 +186,29 @@ def build_parser() -> argparse.ArgumentParser:
     skill_transition_parser.add_argument("--skill", required=True)
     skill_transition_parser.add_argument("--approval", required=True)
     skill_transition_parser.set_defaults(command="skill-transition")
+
+    skill_promotion_candidate_parser = subparsers.add_parser("skill-promotion-candidate")
+    skill_promotion_candidate_parser.add_argument("--root", default=default_root(), type=Path)
+    skill_promotion_candidate_parser.add_argument("--project", required=True)
+    skill_promotion_candidate_parser.add_argument("--skill-id", required=True)
+    skill_promotion_candidate_parser.add_argument("--candidate-id", required=True)
+    skill_promotion_candidate_parser.add_argument("--review-id", required=True)
+    skill_promotion_candidate_parser.set_defaults(command="skill-promotion-candidate")
+
+    skill_promotion_review_parser = subparsers.add_parser("skill-promotion-review")
+    skill_promotion_review_parser.add_argument("--root", default=default_root(), type=Path)
+    skill_promotion_review_parser.add_argument("--project", required=True)
+    skill_promotion_review_parser.add_argument("--skill-id", required=True)
+    skill_promotion_review_parser.add_argument("--candidate-id", required=True)
+    skill_promotion_review_parser.add_argument("--review-id", required=True)
+    skill_promotion_review_parser.add_argument(
+        "--decision",
+        required=True,
+        choices=["approve_global_promotion", "defer", "reject", "request_revision"],
+    )
+    skill_promotion_review_parser.add_argument("--reviewer", required=True)
+    skill_promotion_review_parser.add_argument("--rationale", required=True)
+    skill_promotion_review_parser.set_defaults(command="skill-promotion-review")
 
     return parser
 
@@ -386,6 +411,33 @@ def main(argv: list[str] | None = None) -> int:
             )
             print(skill_file)
             print(history_file)
+            return 0
+
+        if args.command == "skill-promotion-candidate":
+            candidate_path, report_path = skill_promotion_candidate(
+                root,
+                project=args.project,
+                skill_id=args.skill_id,
+                candidate_id=args.candidate_id,
+                review_id=args.review_id,
+            )
+            print(candidate_path)
+            print(report_path)
+            return 0
+
+        if args.command == "skill-promotion-review":
+            review_path, report_path = skill_promotion_review(
+                root,
+                project=args.project,
+                skill_id=args.skill_id,
+                candidate_id=args.candidate_id,
+                review_id=args.review_id,
+                decision=args.decision,
+                reviewer=args.reviewer,
+                rationale=args.rationale,
+            )
+            print(review_path)
+            print(report_path)
             return 0
 
         raise DecodexError(f"unknown command: {args.command}")

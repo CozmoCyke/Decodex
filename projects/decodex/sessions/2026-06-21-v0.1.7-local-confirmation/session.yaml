@@ -1,0 +1,11 @@
+{
+  "id": "2026-06-21-v0.1.7-local-confirmation",
+  "project": "decodex",
+  "date": "2026-06-21",
+  "goal": "Record a local confirmation run for global promotion readiness evidence.",
+  "artifacts": [
+    "report.md",
+    "compliance-report.md",
+    "feedback.yaml"
+  ]
+}

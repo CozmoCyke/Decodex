@@ -1,0 +1,69 @@
+{
+  "id": "context-compliance-review",
+  "title": "Context Compliance Review",
+  "version": "0.1.0",
+  "status": "validated",
+  "scope": "project",
+  "origin_project": "decodex",
+  "origin_projects": [
+    "decodex"
+  ],
+  "tags": [
+    "context",
+    "provenance",
+    "compliance",
+    "validation",
+    "loop"
+  ],
+  "problem": {
+    "summary": "Review generated context against source memory before applying a change."
+  },
+  "when_to_use": [
+    "a generated .codex context needs to be checked before development work",
+    "a session must record whether the context improved the work"
+  ],
+  "preconditions": [
+    "provenance.json exists",
+    "validation commands are recorded",
+    "the session has a compliance report"
+  ],
+  "procedure": [
+    "run context-check",
+    "compare context against source memory",
+    "capture gaps and ambiguities",
+    "record a feedback summary",
+    "wait for human review before promotion"
+  ],
+  "validation": {
+    "required": [
+      "compliance report exists",
+      "feedback recorded",
+      "human validation required"
+    ]
+  },
+  "evidence": [
+    "projects/decodex/sessions/2026-06-20-v0.1.3-self-improving-development-loop/compliance-report.md",
+    "projects/decodex/sessions/2026-06-20-v0.1.3-self-improving-development-loop/feedback.yaml",
+    "projects/decodex/sessions/2026-06-21-v0.1.6-supervised-project-validation/compliance-report.md",
+    "projects/decodex/sessions/2026-06-21-v0.1.6-supervised-project-validation/feedback.yaml"
+  ],
+  "confidence": "medium",
+  "recommendation": "validate_project",
+  "lifecycle": {
+    "state": "validated",
+    "latest_recommendation": "validate_project",
+    "approved_by": "Codex",
+    "approved_review": "2026-06-21-v0.1.6-supervised-project-validation-review",
+    "approval": "2026-06-21-v0.1.6-supervised-project-validation-approval",
+    "human_approval": "approved"
+  },
+  "last_reviewed": "2026-06-21",
+  "application": {
+    "id": "context-compliance-review--decodex--surepython--2026-06-21-v0.1.7-surepython-reuse--0.1.0",
+    "source_project": "decodex",
+    "target_project": "surepython",
+    "session": "2026-06-21-v0.1.7-surepython-reuse",
+    "source_hash": "7ef290b33467c833b8b707ba34f327760a7cfd133120393a42726be3e0250b01",
+    "source_skill_path": "projects/decodex/skills/context-compliance-review/skill.yaml"
+  }
+}

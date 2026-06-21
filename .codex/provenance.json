@@ -19,9 +19,9 @@
       },
       "latest_review": {
         "approved_by": null,
-        "id": "2026-06-21-v0.1.6-supervised-project-validation-review",
-        "path": "projects/decodex/skills/context-compliance-review/reviews/2026-06-21-v0.1.6-supervised-project-validation-review/review.yaml",
-        "recommendation": "validate_project"
+        "id": "2026-06-21-v0.1.7-global-promotion-readiness-review-2",
+        "path": "projects/decodex/skills/context-compliance-review/reviews/2026-06-21-v0.1.7-global-promotion-readiness-review-2/review.yaml",
+        "recommendation": "promote_global"
       },
       "origin_project": "decodex",
       "recommendation": "validate_project",
@@ -58,13 +58,35 @@
       "summary": "Decodex must use its own capture, validation, audit, promotion, context, and provenance mechanisms throughout its development."
     }
   ],
-  "generated_at": "2026-06-21T00:20:29.561032+00:00",
+  "generated_at": "2026-06-21T06:13:10.215323+00:00",
   "generated_hashes": {
     "AGENTS.md": "af2531b6f3c695652496cc2b46140f92f612aab1f433371412147a22a15ffb78",
     "inherited-skills.md": "8317994712dbf394c5a4991ceeb68292d8783f8df5918e4df3681c0cfd3be58f",
-    "project-context.md": "d80ec050dab2274e75d4fca08c46fe12ef30b689d3f25104a7931a39f57dc549",
+    "project-context.md": "749674bdf5aa4ed5932d233f28bc445d9862954414df1db40ab6a242cd6d0597",
     "safety-checklist.md": "36106bd70786f1a5995c76550fac0a6462d169e71fa3cf69d11af1fc80bc29f3",
     "testing-strategy.md": "27a08cfa3edcb4b0448d964a022ca88e165031ac3bcef2b7b089fa35d5d61c6e"
+  },
+  "global_promotion_readiness": {
+    "candidate_id": "2026-06-21-v0.1.7-global-promotion-readiness",
+    "candidate_path": "projects/decodex/skills/context-compliance-review/promotion-candidates/2026-06-21-v0.1.7-global-promotion-readiness/candidate.yaml",
+    "confidence": "high",
+    "cross_project_reuse": true,
+    "human_decision": "approve_global_promotion",
+    "independent_projects": 3,
+    "independent_reuses": 2,
+    "promotion_executed": false,
+    "recommendation": "promote_global",
+    "report_path": "projects/decodex/skills/context-compliance-review/promotion-candidates/2026-06-21-v0.1.7-global-promotion-readiness/report.md",
+    "review_id": "2026-06-21-v0.1.7-global-promotion-readiness-review-2",
+    "review_path": "projects/decodex/skills/context-compliance-review/promotion-candidates/2026-06-21-v0.1.7-global-promotion-readiness/review.yaml",
+    "reviewer": "Codex",
+    "safety_failures": 0,
+    "skill_id": "context-compliance-review",
+    "skill_version": "0.1.0",
+    "status": "global_promotion_ready",
+    "success_rate": 0.8,
+    "unresolved_contradictions": 0,
+    "valid_runs": 5
   },
   "inherited_skills": [
     {
@@ -137,9 +159,9 @@
       },
       "latest_review": {
         "approved_by": null,
-        "id": "2026-06-21-v0.1.6-supervised-project-validation-review",
-        "path": "projects/decodex/skills/context-compliance-review/reviews/2026-06-21-v0.1.6-supervised-project-validation-review/review.yaml",
-        "recommendation": "validate_project"
+        "id": "2026-06-21-v0.1.7-global-promotion-readiness-review-2",
+        "path": "projects/decodex/skills/context-compliance-review/reviews/2026-06-21-v0.1.7-global-promotion-readiness-review-2/review.yaml",
+        "recommendation": "promote_global"
       },
       "lifecycle": {
         "approval": "2026-06-21-v0.1.6-supervised-project-validation-approval",
@@ -150,12 +172,56 @@
         "state": "validated"
       },
       "origin_project": "decodex",
-      "recommendation": "validate_project",
+      "recommendation": "promote_global",
       "scope": "project",
       "source_path": "projects/decodex/skills/context-compliance-review/skill.yaml",
       "status": "validated",
       "title": "Context Compliance Review",
       "version": "0.1.0"
+    }
+  ],
+  "promotion_candidates": [
+    {
+      "candidate_path": "projects/decodex/skills/context-compliance-review/promotion-candidates/2026-06-21-v0.1.7-global-promotion-readiness/candidate.yaml",
+      "confidence": "high",
+      "cross_project_reuse": true,
+      "human_decision": "pending",
+      "id": "2026-06-21-v0.1.7-global-promotion-readiness",
+      "independent_projects": 3,
+      "independent_reuses": 2,
+      "project": "decodex",
+      "promotion_executed": false,
+      "recommendation": "promote_global",
+      "report_path": "projects/decodex/skills/context-compliance-review/promotion-candidates/2026-06-21-v0.1.7-global-promotion-readiness/report.md",
+      "review": {
+        "candidate_id": "2026-06-21-v0.1.7-global-promotion-readiness",
+        "date": "2026-06-21",
+        "decision": "approve_global_promotion",
+        "decision_status": "global_promotion_ready",
+        "evidence": [
+          "projects/decodex/skills/context-compliance-review/promotion-candidates/2026-06-21-v0.1.7-global-promotion-readiness/candidate.yaml",
+          "projects/decodex/skills/context-compliance-review/promotion-candidates/2026-06-21-v0.1.7-global-promotion-readiness/report.md"
+        ],
+        "human_decision": "approve_global_promotion",
+        "id": "2026-06-21-v0.1.7-global-promotion-readiness-human-review",
+        "project": "decodex",
+        "promotion_executed": false,
+        "rationale": "Five valid runs across three projects with one partial run support a global promotion proposal, but no global skill copy is written here.",
+        "reviewer": "Codex",
+        "scope": "project",
+        "skill_id": "context-compliance-review",
+        "skill_version": "0.1.0",
+        "status": "recorded",
+        "target_status": "global_candidate"
+      },
+      "review_id": "2026-06-21-v0.1.7-global-promotion-readiness-review-2",
+      "review_path": "projects/decodex/skills/context-compliance-review/promotion-candidates/2026-06-21-v0.1.7-global-promotion-readiness/review.yaml",
+      "safety_failures": 0,
+      "skill_id": "context-compliance-review",
+      "skill_version": "0.1.0",
+      "success_rate": 0.8,
+      "unresolved_contradictions": 0,
+      "valid_runs": 5
     }
   ],
   "security_rules": [
@@ -188,7 +254,7 @@
     },
     {
       "path": "decodex.yaml",
-      "sha256": "0d7a088d4dfb3e891c3a93332d303ea1a5f8eec8fac6c3dae09b306ece8c7393"
+      "sha256": "e5d4fe79b655ae81e0395389d8eb712d933a84761375d81b8c8d1cf1791ab3a7"
     },
     {
       "path": "registry/skills-index.yaml",
@@ -196,7 +262,7 @@
     },
     {
       "path": "registry/projects-index.yaml",
-      "sha256": "d4384be7910bd1b8835386100c6e7f82b3cae3afda53e2d58d40c16ef4487732"
+      "sha256": "79f1876b14a6cc3cc5382adcabbbf2474008690bfdc8bab9101f1802f4a06012"
     },
     {
       "path": "projects/decodex/project.yaml",
@@ -235,12 +301,20 @@
       "sha256": "607a129a01e5a0a93748888a7d3c144cdb7c047ac431f81cd49e948ce89d2a8d"
     },
     {
+      "path": "projects/decodex/skills/context-compliance-review/evaluations/2026-06-21-v0.1.7-local-confirmation-eval/evaluation.yaml",
+      "sha256": "0b7770b9eff8ed2b6cf06ea113f8ce65e6fa4fffdbed1620faa69212a894f126"
+    },
+    {
       "path": "projects/decodex/skills/context-compliance-review/evaluations/source-eval/evaluation.yaml",
       "sha256": "e91f6440126b540d2c6ec63003c6ac1386c347631b6b3e91d861260ee26ba7ba"
     },
     {
       "path": "projects/pac-hunt-2/skills/context-compliance-review/evaluations/target-eval/evaluation.yaml",
       "sha256": "2ba9d368fbbc25c9a445cf6606d66c53ac43e638a7d7e01c1774bdb300123ab2"
+    },
+    {
+      "path": "projects/surepython/skills/context-compliance-review/evaluations/2026-06-21-v0.1.7-surepython-reuse-eval/evaluation.yaml",
+      "sha256": "98430e42ab380db980d3e8a524ede5ba02ecbfa11505910dff806b110f73e6bb"
     },
     {
       "path": "projects/decodex/skills/context-compliance-review/reviews/2026-06-20-v0.1.4-evidence-based-skill-lifecycle/review.yaml",
@@ -251,6 +325,14 @@
       "sha256": "624d44fca65c7eaf6f59ec58cf7bc97dcb45c31942c903c9cac82b5e21603f24"
     },
     {
+      "path": "projects/decodex/skills/context-compliance-review/reviews/2026-06-21-v0.1.7-global-promotion-readiness-review/review.yaml",
+      "sha256": "87cdec55a3b0b19144dcc8669ef358645c9f1f7d95fa94f0e6cb9a4702be3d99"
+    },
+    {
+      "path": "projects/decodex/skills/context-compliance-review/reviews/2026-06-21-v0.1.7-global-promotion-readiness-review-2/review.yaml",
+      "sha256": "b3643acf5c2a9fecd114269dca8f005e4e7840808db84fec1bdc3e6ef61f6c30"
+    },
+    {
       "path": "projects/pac-hunt-2/skills/context-compliance-review/reviews/cross-project-review/review.yaml",
       "sha256": "eda677928fb5f9a3c434b0fd11f8882bfebf3b5b20b098fdd1374979cf8b8361"
     },
@@ -259,12 +341,24 @@
       "sha256": "bcbc28fe303a1c7fd00d335941936f139bd18f310fa804bab55c15d8bae07525"
     },
     {
+      "path": "projects/decodex/skills/context-compliance-review/promotion-candidates/2026-06-21-v0.1.7-global-promotion-readiness/candidate.yaml",
+      "sha256": "de75be79b54930c85e9ac97bc2672d52c00c522381c5656752f22728688d4d0d"
+    },
+    {
+      "path": "projects/decodex/skills/context-compliance-review/promotion-candidates/2026-06-21-v0.1.7-global-promotion-readiness/review.yaml",
+      "sha256": "894074b058cef69cfdd1c3ccb74554f5a1385e87891dfc578121ca7f14524bf9"
+    },
+    {
       "path": "projects/decodex/sessions/2026-06-21-v0.1.6-supervised-project-validation/skill-applications/context-compliance-review--decodex--decodex--2026-06-21-v0.1.6-supervised-project-validation--0.1.0/application.yaml",
       "sha256": "72caaeda63ff08212f1a74ea5c4bad740433d448094aa0b754c21cba4096e416"
     },
     {
       "path": "projects/pac-hunt-2/sessions/2026-06-20-v0.1.5-cross-project-reuse/skill-applications/context-compliance-review--decodex--pac-hunt-2--2026-06-20-v0.1.5-cross-project-reuse--0.1.0/application.yaml",
       "sha256": "b8bbe14b29dcfdea9f896a3c2c56ecb32017f809a5f4a23bbd874f4c72376d39"
+    },
+    {
+      "path": "projects/surepython/sessions/2026-06-21-v0.1.7-surepython-reuse/skill-applications/context-compliance-review--decodex--surepython--2026-06-21-v0.1.7-surepython-reuse--0.1.0/application.yaml",
+      "sha256": "9234540aa56633642a410234daa17e1a2c24f7e0e5588a441b586ab95e002524"
     },
     {
       "path": "projects/decodex/sessions/2026-06-21-v0.1.6-supervised-project-validation/skill-applications/context-compliance-review--decodex--decodex--2026-06-21-v0.1.6-supervised-project-validation--0.1.0/application.md",
@@ -281,11 +375,27 @@
     {
       "path": "projects/pac-hunt-2/sessions/2026-06-20-v0.1.5-cross-project-reuse/session.yaml",
       "sha256": "8960cef1ba78fad890fedfff05a6ffd861c7e2a3cf83163438dae303758441aa"
+    },
+    {
+      "path": "projects/surepython/sessions/2026-06-21-v0.1.7-surepython-reuse/skill-applications/context-compliance-review--decodex--surepython--2026-06-21-v0.1.7-surepython-reuse--0.1.0/report.md",
+      "sha256": "00213eaf9d572dfc37407355a527b3758954d1d44b6434f8127db468dce9afa0"
+    },
+    {
+      "path": "projects/surepython/sessions/2026-06-21-v0.1.7-surepython-reuse/session.yaml",
+      "sha256": "e3da82a9da4178d230d6bdbabeb61a7ecf860d9b49be3f2213db8866ee85ae04"
+    },
+    {
+      "path": "projects/decodex/skills/context-compliance-review/promotion-candidates/2026-06-21-v0.1.7-global-promotion-readiness/report.md",
+      "sha256": "1935ae6f164f2f6c1973662320cc7af0151877ee79b3b8808f37f24c9e4adcbe"
+    },
+    {
+      "path": "projects/decodex/skills/context-compliance-review/promotion-candidates/2026-06-21-v0.1.7-global-promotion-readiness/review.md",
+      "sha256": "5215067d84b58622fae4c07d0f829e6cd5eecb11fde8c2448f51480f7ba01a3a"
     }
   ],
   "source_hashes": {
     "README.md": "43f1868c97b0733e141bce36efc29afed35ccdb370d1c8ab212013bbebfacf87",
-    "decodex.yaml": "0d7a088d4dfb3e891c3a93332d303ea1a5f8eec8fac6c3dae09b306ece8c7393",
+    "decodex.yaml": "e5d4fe79b655ae81e0395389d8eb712d933a84761375d81b8c8d1cf1791ab3a7",
     "global/skills/safe-runtime-modification/skill.yaml": "0be71338ca4905b896c8f0b0c4e69de08b82aff723b10d4f198859de251248b3",
     "global/skills/static-dynamic-render-split/skill.yaml": "24b7f4494e1cc62fce747165fd904151d358bfcb87f147a0a50aef51cb7ae3a9",
     "projects/decodex/decisions/0001-supervised-self-improving-loop.json": "fae8d3cdf07170fc43cd35e7a5110008a89a43fc78ac5b9b3337348ae86aecad",
@@ -297,9 +407,16 @@
     "projects/decodex/skills/context-compliance-review/approvals/2026-06-21-v0.1.6-supervised-project-validation-approval/approval.yaml": "bcbc28fe303a1c7fd00d335941936f139bd18f310fa804bab55c15d8bae07525",
     "projects/decodex/skills/context-compliance-review/evaluations/2026-06-20-v0.1.4-evidence-based-skill-lifecycle/evaluation.yaml": "48dfc6e7bd147f3b85b7a970d7d066c81b4ac10cbffd55e837b6f4e20213eb46",
     "projects/decodex/skills/context-compliance-review/evaluations/2026-06-21-v0.1.6-supervised-project-validation-eval/evaluation.yaml": "607a129a01e5a0a93748888a7d3c144cdb7c047ac431f81cd49e948ce89d2a8d",
+    "projects/decodex/skills/context-compliance-review/evaluations/2026-06-21-v0.1.7-local-confirmation-eval/evaluation.yaml": "0b7770b9eff8ed2b6cf06ea113f8ce65e6fa4fffdbed1620faa69212a894f126",
     "projects/decodex/skills/context-compliance-review/evaluations/source-eval/evaluation.yaml": "e91f6440126b540d2c6ec63003c6ac1386c347631b6b3e91d861260ee26ba7ba",
+    "projects/decodex/skills/context-compliance-review/promotion-candidates/2026-06-21-v0.1.7-global-promotion-readiness/candidate.yaml": "de75be79b54930c85e9ac97bc2672d52c00c522381c5656752f22728688d4d0d",
+    "projects/decodex/skills/context-compliance-review/promotion-candidates/2026-06-21-v0.1.7-global-promotion-readiness/report.md": "1935ae6f164f2f6c1973662320cc7af0151877ee79b3b8808f37f24c9e4adcbe",
+    "projects/decodex/skills/context-compliance-review/promotion-candidates/2026-06-21-v0.1.7-global-promotion-readiness/review.md": "5215067d84b58622fae4c07d0f829e6cd5eecb11fde8c2448f51480f7ba01a3a",
+    "projects/decodex/skills/context-compliance-review/promotion-candidates/2026-06-21-v0.1.7-global-promotion-readiness/review.yaml": "894074b058cef69cfdd1c3ccb74554f5a1385e87891dfc578121ca7f14524bf9",
     "projects/decodex/skills/context-compliance-review/reviews/2026-06-20-v0.1.4-evidence-based-skill-lifecycle/review.yaml": "0e73a2c1bc063a0a1735d04e77da6a22414509ad9b5b04479ed431ff11896bf1",
     "projects/decodex/skills/context-compliance-review/reviews/2026-06-21-v0.1.6-supervised-project-validation-review/review.yaml": "624d44fca65c7eaf6f59ec58cf7bc97dcb45c31942c903c9cac82b5e21603f24",
+    "projects/decodex/skills/context-compliance-review/reviews/2026-06-21-v0.1.7-global-promotion-readiness-review-2/review.yaml": "b3643acf5c2a9fecd114269dca8f005e4e7840808db84fec1bdc3e6ef61f6c30",
+    "projects/decodex/skills/context-compliance-review/reviews/2026-06-21-v0.1.7-global-promotion-readiness-review/review.yaml": "87cdec55a3b0b19144dcc8669ef358645c9f1f7d95fa94f0e6cb9a4702be3d99",
     "projects/decodex/skills/context-compliance-review/skill.yaml": "7ef290b33467c833b8b707ba34f327760a7cfd133120393a42726be3e0250b01",
     "projects/decodex/skills/context-compliance-review/versions/0.1.0/skill.yaml": "c4b66cc9849cb47d8ea8c68a84a8ea817ab13e07362306c3e81a6dfacf9d8f11",
     "projects/pac-hunt-2/sessions/2026-06-20-v0.1.5-cross-project-reuse/session.yaml": "8960cef1ba78fad890fedfff05a6ffd861c7e2a3cf83163438dae303758441aa",
@@ -307,7 +424,11 @@
     "projects/pac-hunt-2/sessions/2026-06-20-v0.1.5-cross-project-reuse/skill-applications/context-compliance-review--decodex--pac-hunt-2--2026-06-20-v0.1.5-cross-project-reuse--0.1.0/report.md": "6ec6fa7d718b66ffaad009bc3af75bcb8fa9d3313b7ff34cb142888759fb1542",
     "projects/pac-hunt-2/skills/context-compliance-review/evaluations/target-eval/evaluation.yaml": "2ba9d368fbbc25c9a445cf6606d66c53ac43e638a7d7e01c1774bdb300123ab2",
     "projects/pac-hunt-2/skills/context-compliance-review/reviews/cross-project-review/review.yaml": "eda677928fb5f9a3c434b0fd11f8882bfebf3b5b20b098fdd1374979cf8b8361",
-    "registry/projects-index.yaml": "d4384be7910bd1b8835386100c6e7f82b3cae3afda53e2d58d40c16ef4487732",
+    "projects/surepython/sessions/2026-06-21-v0.1.7-surepython-reuse/session.yaml": "e3da82a9da4178d230d6bdbabeb61a7ecf860d9b49be3f2213db8866ee85ae04",
+    "projects/surepython/sessions/2026-06-21-v0.1.7-surepython-reuse/skill-applications/context-compliance-review--decodex--surepython--2026-06-21-v0.1.7-surepython-reuse--0.1.0/application.yaml": "9234540aa56633642a410234daa17e1a2c24f7e0e5588a441b586ab95e002524",
+    "projects/surepython/sessions/2026-06-21-v0.1.7-surepython-reuse/skill-applications/context-compliance-review--decodex--surepython--2026-06-21-v0.1.7-surepython-reuse--0.1.0/report.md": "00213eaf9d572dfc37407355a527b3758954d1d44b6434f8127db468dce9afa0",
+    "projects/surepython/skills/context-compliance-review/evaluations/2026-06-21-v0.1.7-surepython-reuse-eval/evaluation.yaml": "98430e42ab380db980d3e8a524ede5ba02ecbfa11505910dff806b110f73e6bb",
+    "registry/projects-index.yaml": "79f1876b14a6cc3cc5382adcabbbf2474008690bfdc8bab9101f1802f4a06012",
     "registry/skills-index.yaml": "ca397df67d12b17c668641943a73080149f9906f99f90d276aaa73bb3ff93188"
   },
   "validation_commands": [

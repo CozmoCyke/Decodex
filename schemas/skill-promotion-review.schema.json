@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Decodex Skill Promotion Review",
+  "x-decodex-version": "0.1.7",
+  "type": "object",
+  "required": [
+    "id",
+    "candidate_id",
+    "skill_id",
+    "skill_version",
+    "project",
+    "reviewer",
+    "date",
+    "status",
+    "decision",
+    "decision_status",
+    "scope",
+    "target_status",
+    "rationale",
+    "evidence",
+    "promotion_executed",
+    "human_decision"
+  ],
+  "properties": {
+    "id": { "type": "string" },
+    "candidate_id": { "type": "string" },
+    "skill_id": { "type": "string" },
+    "skill_version": { "type": "string" },
+    "project": { "type": "string" },
+    "reviewer": { "type": "string" },
+    "date": { "type": "string" },
+    "status": { "type": "string" },
+    "decision": { "type": "string" },
+    "decision_status": { "type": "string" },
+    "scope": { "type": "string" },
+    "target_status": { "type": "string" },
+    "rationale": { "type": "string" },
+    "evidence": { "type": "array", "items": { "type": "string" } },
+    "promotion_executed": { "type": "boolean" },
+    "human_decision": { "type": "string" }
+  },
+  "additionalProperties": true
+}

@@ -119,7 +119,7 @@ class SkillLifecycleTests(unittest.TestCase):
         self.assertTrue(any(skill["version"] == "0.1.0" for skill in project_skills))
         self.assertTrue(any(skill["status"] == "validated" for skill in project_skills))
         self.assertTrue(any(skill["confidence"] == "medium" for skill in project_skills))
-        self.assertTrue(any(skill["recommendation"] == "validate_project" for skill in project_skills))
+        self.assertTrue(any(skill["recommendation"] == "promote_global" for skill in project_skills))
         self.assertTrue(any(skill.get("latest_review") for skill in project_skills))
 
     def _case_session_close_preserves_version(self) -> None:
@@ -367,7 +367,7 @@ class SkillLifecycleTests(unittest.TestCase):
     def _case_runtime_resolution(self) -> None:
         repo = self.make_repo()
         self.assertTrue((repo / "decodex.yaml").exists())
-        self.assertEqual(load_jsonish(repo / "decodex.yaml")["version"], "0.1.6")
+        self.assertEqual(load_jsonish(repo / "decodex.yaml")["version"], "0.1.7")
 
 
 if __name__ == "__main__":

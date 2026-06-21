@@ -1,0 +1,26 @@
+{
+  "id": "2026-06-21-v0.1.7-surepython-reuse-eval",
+  "skill_id": "context-compliance-review",
+  "skill_version": "0.1.0",
+  "project": "surepython",
+  "session": "2026-06-21-v0.1.7-surepython-reuse",
+  "status": "passed",
+  "runs": 1,
+  "successful_runs": 0,
+  "confidence": "low",
+  "recommendation": "continue_evaluation",
+  "evidence": [
+    "projects/surepython/sessions/2026-06-21-v0.1.7-surepython-reuse/compliance-report.md",
+    "projects/surepython/sessions/2026-06-21-v0.1.7-surepython-reuse/feedback.yaml",
+    "projects/surepython/sessions/2026-06-21-v0.1.7-surepython-reuse/skill-applications/context-compliance-review--decodex--surepython--2026-06-21-v0.1.7-surepython-reuse--0.1.0/application.yaml"
+  ],
+  "contradictions": [],
+  "notes": [
+    "first surepython reuse run",
+    "partial outcome recorded deliberately"
+  ],
+  "application_id": "context-compliance-review--decodex--surepython--2026-06-21-v0.1.7-surepython-reuse--0.1.0",
+  "application_path": "projects/surepython/sessions/2026-06-21-v0.1.7-surepython-reuse/skill-applications/context-compliance-review--decodex--surepython--2026-06-21-v0.1.7-surepython-reuse--0.1.0/application.yaml",
+  "source_project": "decodex",
+  "target_project": "surepython"
+}
