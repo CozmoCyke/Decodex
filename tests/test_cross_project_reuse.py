@@ -49,7 +49,7 @@ class CrossProjectReuseTests(unittest.TestCase):
         self._remove_tree(repo / "projects" / "pac-hunt-2" / "skills" / "context-compliance-review")
         self._remove_tree(repo / "projects" / "pac-hunt-2" / ".codex")
         self._remove_tree(repo / ".codex")
-        return repo
+        return repo.resolve()
 
     def _remove_tree(self, path: Path) -> None:
         if path.exists():
